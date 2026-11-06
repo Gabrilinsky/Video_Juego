@@ -1,0 +1,38 @@
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #030305;
+  color: #f4f4f5;
+  user-select: none;
+  overflow-x: hidden;
+}
+
+.font-mk { 
+  font-family: 'Cinzel Decorative', cursive, serif; 
+}
+
+.glow-red { 
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.9), 0 0 24px rgba(220, 38, 38, 0.7); 
+}
+
+.glow-gold { 
+  text-shadow: 0 0 12px rgba(234, 179, 8, 0.9), 0 0 24px rgba(202, 138, 4, 0.7); 
+}
+
+.box-glow-red { 
+  box-shadow: 0 0 25px rgba(220, 38, 38, 0.4), inset 0 0 15px rgba(185, 28, 28, 0.3); 
+}
+
+.box-glow-blue { 
+  box-shadow: 0 0 25px rgba(37, 99, 235, 0.4), inset 0 0 15px rgba(29, 78, 216, 0.3); 
+}
+
+::-webkit-scrollbar { 
+  width: 6px; 
+}
+::-webkit-scrollbar-track { 
+  background: #090d16; 
+}
+::-webkit-scrollbar-thumb { 
+  background: #e11d48; 
+  border-radius: 3px; 
+}

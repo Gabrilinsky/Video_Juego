@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shadow Kombat 2D - Articulaciones y Combate</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body class="min-h-screen flex flex-col justify-between bg-black text-gray-100 select-none overflow-x-hidden font-sans">
+
+  <!-- ENCABEZADO -->
+  <header class="w-full bg-stone-950/95 border-b border-red-900/60 py-3 px-6 flex justify-between items-center z-20 backdrop-blur-md">
+    <div class="flex items-center space-x-3">
+      <i class="fa-solid fa-crown text-3xl text-amber-500 animate-pulse glow-gold"></i>
+      <h1 class="font-mk text-xl md:text-3xl font-extrabold text-red-600 tracking-wider glow-red">
+        SHADOW KOMBAT <span class="text-amber-500 text-sm md:text-xl block md:inline font-sans font-bold">2D ARENA</span>
+      </h1>
+    </div>
+    <div class="flex items-center space-x-3">
+      <button id="btn-toggle-sound" class="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 border border-stone-700 rounded-lg text-xs font-semibold flex items-center transition">
+        <i class="fa-solid fa-volume-high text-amber-500 mr-2" id="sound-icon"></i>
+        <span id="sound-text">AUDIO ON</span>
+      </button>
+      <button id="btn-show-controls" class="px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-700 rounded-lg text-xs font-semibold text-red-200 transition flex items-center">
+        <i class="fa-solid fa-keyboard mr-2 text-red-400"></i> CONTROLES
+      </button>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <main class="flex-grow flex items-center justify-center p-2 md:p-4 relative w-full max-w-7xl mx-auto">
+
+    <!-- PANTALLA DE SELECCIÓN Y CONFIGURACIÓN DE LUCHADOR -->
+    <div id="selection-screen" class="w-full bg-stone-950/95 border-2 border-red-900/60 rounded-2xl p-4 md:p-6 shadow-2xl backdrop-blur-xl transition-all duration-500 flex flex-col justify-between my-auto">
+      
+      <div class="text-center mb-3">
+        <h2 class="font-mk text-2xl md:text-4xl text-amber-500 glow-gold">SELECCIÓN DE LUCHADOR Y ARSENAL 2D</h2>
+        <p class="text-stone-400 text-xs md:text-sm mt-1">Brazos con articulación dinámica para golpes de puño, espada y proyectiles</p>
+      </div>
+
+      <!-- MODO DE JUEGO -->
+      <div class="flex justify-center space-x-4 mb-3">
+        <button id="btn-mode-tower" class="px-6 py-2.5 bg-gradient-to-r from-amber-700 to-red-800 text-white font-mk text-sm md:text-base rounded-xl border-2 border-amber-400 font-bold transition shadow-lg box-glow-gold">
+          <i class="fa-solid fa-tower-observation mr-2"></i> MODO TORRE (1P VS CPU)
+        </button>
+        <button id="btn-mode-versus" class="px-6 py-2.5 bg-stone-900 text-stone-400 hover:text-white font-mk text-sm md:text-base rounded-xl border border-stone-700 font-bold transition">
+          <i class="fa-solid fa-users mr-2"></i> MODO VERSUS (2P LOCAL)
+        </button>
+      </div>
+
+      <!-- CONFIGURACIÓN DE ARENA Y CPU -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+        <div class="bg-stone-900/90 border border-stone-800 rounded-xl p-2.5 flex items-center justify-between">
+          <span class="text-xs font-bold text-amber-400 font-mk"><i class="fa-solid fa-map-location-dot mr-2"></i> ARENA:</span>
+          <select id="select-arena" class="bg-stone-950 border border-amber-600/60 rounded px-3 py-1 text-xs text-amber-200 font-bold outline-none">
+            <option value="colosseum">Coliseo Imperial</option>
+            <option value="temple">Templo de las Sombras</option>
+            <option value="volcano">Dojo Volcánico</option>
+            <option value="tundra">Tundra Helada</option>
+          </select>
+        </div>
+        <div class="bg-stone-900/90 border border-stone-800 rounded-xl p-2.5 flex items-center justify-between">
+          <span class="text-xs font-bold text-amber-400 font-mk"><i class="fa-solid fa-brain mr-2"></i> DIFICULTAD CPU:</span>
+          <select id="select-difficulty" class="bg-stone-950 border border-amber-600/60 rounded px-3 py-1 text-xs text-amber-200 font-bold outline-none">
+            <option value="FACIL">Fácil</option>
+            <option value="MEDIO" selected>Medio</option>
+            <option value="DIFICIL">Difícil</option>
+            <option value="EXTREMO">Extremo</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- PERSONALIZACIÓN DE JUGADORES -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 my-2">
+        <!-- P1 -->
+        <div class="bg-stone-900/80 border border-red-800/40 rounded-xl p-4 box-glow-red relative flex flex-col justify-between">
+          <div class="absolute -top-3 left-4 bg-red-700 text-white font-mk text-xs px-3 py-0.5 rounded shadow font-bold tracking-widest">
+            JUGADOR 1 (WASD)
+          </div>
+          <div class="flex justify-between items-center mb-3 mt-2 bg-stone-950/90 border border-stone-800 rounded-lg p-3">
+            <div class="w-1/2 flex flex-col items-center">
+              <canvas id="preview-p1" width="160" height="195" class="bg-stone-900/60 rounded border border-red-900/40 shadow-inner"></canvas>
+            </div>
+            <div class="w-1/2 pl-3 space-y-1 text-xs">
+              <div class="flex justify-between text-stone-400"><span>Brazos:</span> <span class="text-red-400 font-bold">Articulados 2D</span></div>
+              <div class="flex justify-between text-stone-400"><span>Vida:</span> <span class="text-emerald-400 font-bold">100 HP</span></div>
+            </div>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-stone-300 font-bold mb-1">Traje (50):</label>
+                <select id="p1-outfit" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-stone-200 outline-none"></select>
+              </div>
+              <div>
+                <label class="block text-stone-300 font-bold mb-1">Poder Elemental (50):</label>
+                <select id="p1-element" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-stone-200 outline-none"></select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-stone-300 font-bold mb-1">Arma Melee (50):</label>
+                <select id="p1-weapon1" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-stone-200"></select>
+              </div>
+              <div>
+                <label class="block text-stone-300 font-bold mb-1">Proyectil (50):</label>
+                <select id="p1-weapon2" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-stone-200"></select>
+              </div>
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-stone-800">
+              <span class="text-[11px] text-stone-400 font-bold">Colores:</span>
+              <div class="flex space-x-3">
+                <label class="flex items-center space-x-1 text-[10px] text-stone-300">Piel: <input type="color" id="p1-color-skin" value="#fca5a5" class="bg-transparent w-5 h-5 cursor-pointer"></label>
+                <label class="flex items-center space-x-1 text-[10px] text-stone-300">Ropa: <input type="color" id="p1-color-suit" value="#dc2626" class="bg-transparent w-5 h-5 cursor-pointer"></label>
+                <label class="flex items-center space-x-1 text-[10px] text-stone-300">Aura: <input type="color" id="p1-color-aura" value="#ff4500" class="bg-transparent w-5 h-5 cursor-pointer"></label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- P2 / CPU -->
+        <div id="container-p2" class="bg-stone-900/80 border border-blue-800/40 rounded-xl p-4 box-glow-blue relative flex flex-col justify-between">
+          <div id="p2-header-badge" class="absolute -top-3 left-4 bg-blue-700 text-white font-mk text-xs px-3 py-0.5 rounded shadow font-bold tracking-widest">
+            OPONENTE TORRE (CPU)
+          </div>
+          <div class="flex justify-between items-center mb-3 mt-2 bg-stone-950/90 border border-stone-800 rounded-lg p-3">
+            <div class="w-1/2 flex flex-col items-center">
+              <canvas id="preview-p2" width="160" height="195" class="bg-stone-900/60 rounded border border-blue-900/40 shadow-inner"></canvas>
+            </div>
+            <div class="w-1/2 pl-3 space-y-1 text-xs">
+              <div class="flex justify-between text-stone-400"><span>Brazos:</span> <span class="text-blue-400 font-bold">Articulados 2D</span></div>
+              <div class="flex justify-between text-stone-400"><span>Vida:</span> <span class="text-emerald-400 font-bold">100 HP</span></div>
+            </div>
+          </div>
+          <div class="space-y-2 text-xs">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-stone-300 font-bold mb-1">Traje (50):</label>
+                <select id="p2-outfit" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-stone-200 outline-none"></select>
+              </div>
+              <div>
+                <label class="block text-stone-300 font-bold mb-1">Poder Elemental (50):</label>
+                <select id="p2-element" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-stone-200 outline-none"></select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-stone-300 font-bold mb-1">Arma Melee (50):</label>
+                <select id="p2-weapon1" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-stone-200"></select>
+              </div>
+              <div>
+                <label class="block text-stone-300 font-bold mb-1">Proyectil (50):</label>
+                <select id="p2-weapon2" class="w-full bg-stone-950 border border-stone-700 rounded px-2 py-1 text-stone-200"></select>
+              </div>
+            </div>
+            <div class="flex justify-between items-center pt-2 border-t border-stone-800">
+              <span class="text-[11px] text-stone-400 font-bold">Colores:</span>
+              <div class="flex space-x-3">
+                <label class="flex items-center space-x-1 text-[10px] text-stone-300">Piel: <input type="color" id="p2-color-skin" value="#e2e8f0" class="bg-transparent w-5 h-5 cursor-pointer"></label>
+                <label class="flex items-center space-x-1 text-[10px] text-stone-300">Ropa: <input type="color" id="p2-color-suit" value="#2563eb" class="bg-transparent w-5 h-5 cursor-pointer"></label>
+                <label class="flex items-center space-x-1 text-[10px] text-stone-300">Aura: <input type="color" id="p2-color-aura" value="#00ffff" class="bg-transparent w-5 h-5 cursor-pointer"></label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTÓN PRINCIPAL -->
+      <div class="text-center mt-3">
+        <button id="btn-start-fight" class="w-full md:w-3/4 py-3.5 bg-gradient-to-r from-red-700 via-amber-600 to-red-700 hover:from-red-600 hover:to-red-600 text-white font-mk text-xl md:text-2xl rounded-xl shadow-lg border-2 border-amber-400 transition-transform active:scale-95 tracking-widest glow-gold">
+          ¡INICIAR COMBATE EN LA ARENA 2D!
+        </button>
+      </div>
+    </div>
+
+    <!-- CANVAS DE JUEGO -->
+    <div id="game-screen" class="hidden w-full relative flex flex-col items-center">
+      <div class="w-full max-w-5xl bg-stone-950/90 border border-stone-800 rounded-t-xl p-3 flex justify-between items-center z-10 shadow-lg backdrop-blur-md">
+        <!-- P1 HUD -->
+        <div class="w-5/12 space-y-1">
+          <div class="flex justify-between items-center text-xs font-bold">
+            <span id="hud-p1-name" class="text-red-400 uppercase tracking-wider">JUGADOR 1</span>
+            <span id="hud-p1-hp-text" class="text-stone-300">100 HP</span>
+          </div>
+          <div class="w-full h-5 bg-stone-900 border border-stone-700 rounded-lg overflow-hidden p-0.5">
+            <div id="hud-p1-hp-fill" class="h-full bg-gradient-to-r from-red-700 to-red-500 rounded transition-all duration-100" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center px-4">
+          <div id="game-timer" class="font-mk text-3xl font-black text-amber-400 glow-gold">99</div>
+        </div>
+
+        <!-- P2 HUD -->
+        <div class="w-5/12 space-y-1">
+          <div class="flex justify-between items-center text-xs font-bold">
+            <span id="hud-p2-hp-text" class="text-stone-300">100 HP</span>
+            <span id="hud-p2-name" class="text-blue-400 uppercase tracking-wider">OPONENTE</span>
+          </div>
+          <div class="w-full h-5 bg-stone-900 border border-stone-700 rounded-lg overflow-hidden p-0.5">
+            <div id="hud-p2-hp-fill" class="h-full bg-gradient-to-l from-blue-700 to-cyan-500 rounded transition-all duration-100 float-right" style="width: 100%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="canvas-wrapper" class="relative w-full max-w-5xl aspect-[16/9] bg-stone-950 border-x border-b border-red-900/40 rounded-b-xl overflow-hidden shadow-2xl">
+        <canvas id="gameCanvas" width="1200" height="675" class="w-full h-full block"></canvas>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL DE CONTROLES -->
+  <div id="modal-controls" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-stone-900 border-2 border-red-800 rounded-2xl p-6 max-w-2xl w-full text-stone-200 relative shadow-2xl">
+      <button id="btn-close-controls" class="absolute top-4 right-4 text-stone-400 hover:text-white text-xl">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <h3 class="font-mk text-2xl text-amber-400 mb-4 text-center glow-gold">CONTROLES COMBATE 2D</h3>
+      <div class="grid grid-cols-2 gap-4 text-xs">
+        <div>
+          <h4 class="font-bold text-red-400 mb-2">Jugador 1 (WASD)</h4>
+          <ul class="space-y-1">
+            <li><b>A / D:</b> Moverse</li>
+            <li><b>W:</b> Saltar</li>
+            <li><b>S:</b> Bloquear</li>
+            <li><b>J:</b> Golpe de Puño (Ataque Ligero)</li>
+            <li><b>L:</b> Corte de Espada/Arma (Ataque Pesado)</li>
+            <li><b>U:</b> Lanzar Proyectil</li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="font-bold text-blue-400 mb-2">Jugador 2 (Flechas)</h4>
+          <ul class="space-y-1">
+            <li><b>Izq / Der:</b> Moverse</li>
+            <li><b>Arriba:</b> Saltar</li>
+            <li><b>Abajo:</b> Bloquear</li>
+            <li><b>F / Numpad 1:</b> Golpe Puño</li>
+            <li><b>H / Numpad 3:</b> Corte Arma</li>
+            <li><b>V / Numpad 7:</b> Proyectil</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE VICTORIA -->
+  <div id="modal-victory" class="fixed inset-0 bg-black/85 backdrop-blur-lg z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-stone-950 border-2 border-amber-500 rounded-2xl p-6 max-w-lg w-full text-center shadow-2xl box-glow-red">
+      <i class="fa-solid fa-trophy text-5xl text-amber-400 mb-2 glow-gold"></i>
+      <h2 id="victory-title" class="font-mk text-4xl text-red-600 glow-red">¡FINISH HIM!</h2>
+      <p id="victory-subtitle" class="text-lg text-amber-300 font-bold mt-1">VICTORIA EN COMBATE 2D</p>
+      <div class="flex space-x-3 justify-center mt-6">
+        <button id="btn-rematch" class="px-5 py-2.5 bg-red-700 hover:bg-red-600 text-white font-mk text-sm rounded-xl font-bold transition">RECONTRATAR COMBATE</button>
+        <button id="btn-re-select" class="px-5 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-200 font-mk text-sm rounded-xl font-bold transition">VOLVER AL MENÚ</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="static/js/script.js"></script>
+</body>
+</html>

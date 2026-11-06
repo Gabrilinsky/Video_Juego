@@ -1,0 +1,15 @@
+Crea un videojuego de pelea 2D estilo Mortal Kombat modularizado en HTML, CSS y JavaScript con HTML5 Canvas y Tailwind CSS.
+
+1. ESTRUCTURA Y ARCHIVOS:
+   - index.html: Lienzo Canvas HTML5, HUD de interfaz, inclusión de Tailwind CSS y enlace a styles.css y script.js.
+   - styles.css: Estilos visuales del contenedor, animaciones CSS, bordes de neón y diseño responsivo.
+   - script.js: Lógica del motor de juego, Web Audio API, sintetizador vocal, IA de CPU, físicas, combos y renderizado vectorial 2D.
+
+2. CARACTERÍSTICAS TÉCNICAS Y MECÁNICAS:
+   - Modos de Juego: Torre de Desafíos (1P vs CPU hasta el Jefe Final Emperador Kahn) y Versus Local (2 Players).
+   - Dificultades de CPU Seleccionables: Fácil, Medio, Difícil y Extremo.
+   - Controles P1: WASD (Movimiento/Salto/Bloqueo) | J, K (Ataques Ligero y Pesado), L, U, I, O (Armas y Super).
+   - Controles P2: Flechas de dirección | Numpad 1, 2, 3, 7, 8, 9 o teclas F, G, H, V, B, N.
+   - Catálogo Expandido: 50 Armas Melee, 50 Armas de Distancia/Proyectiles, 50 Elementos/Poderes y 50 Trajes Nominados.
+   - Renderizado Gráfico: Personajes anatómicos 2D (músculos, capas de ropa/armadura y animación de caminata articular).
+   - Sistema de Combate: Escudo de energía al bloquear (80% reducción de daño), Poder Oculto (activado automáticamente tras 3+ hits en combo) y Ataques Finales cinemáticos.
