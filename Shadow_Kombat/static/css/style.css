@@ -29,10 +29,21 @@ body {
 ::-webkit-scrollbar { 
   width: 6px; 
 }
+
 ::-webkit-scrollbar-track { 
   background: #090d16; 
 }
+
 ::-webkit-scrollbar-thumb { 
   background: #e11d48; 
   border-radius: 3px; 
+}
+
+@keyframes pulse-fast {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.03); }
+}
+
+.animate-pulse-fast { 
+  animation: pulse-fast 1.2s infinite ease-in-out; 
 }
