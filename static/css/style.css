@@ -170,3 +170,76 @@ body {
     min-height: 38px;
   }
 }
+
+body.phone-mode {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+body.phone-mode header {
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+body.phone-mode header h1 {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+body.phone-mode main {
+  align-items: flex-start;
+  padding: 8px;
+}
+
+body.phone-mode #selection-screen {
+  max-width: 760px;
+  max-height: calc(100dvh - 98px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px;
+}
+
+body.phone-mode #fighter-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.phone-mode #game-screen {
+  max-width: 620px;
+  margin: 0 auto;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+body.phone-mode #canvas-wrapper {
+  aspect-ratio: 16 / 10;
+  max-height: 48dvh;
+}
+
+body.phone-mode #touch-controls {
+  display: grid !important;
+  max-width: 620px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+body.phone-mode #touch-controls-p2:not(.hidden) {
+  display: block !important;
+}
+
+body.phone-mode #touch-controls .grid-cols-2 > .grid-cols-3 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body.phone-mode #p1-combo-display,
+body.phone-mode #p2-combo-display {
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  text-align: left;
+}
+
+body.phone-mode #p1-combo-count,
+body.phone-mode #p2-combo-count {
+  font-size: 18px;
+}

@@ -553,6 +553,9 @@ class HumanoidFighter3D {
     } else if (this.state === 'light') {
       this.rightShoulder.rotation.x = -Math.PI / 2;
       this.rightForearm.rotation.x = -0.3;
+    } else if (this.state === 'heavy') {
+      this.leftShoulder.rotation.x = -Math.PI / 2;
+      this.leftForearm.rotation.x = -0.6;
     } else if (this.state === 'weapon1') {
       this.rightShoulder.rotation.x = -Math.PI * 0.75;
       this.rightForearm.rotation.x = -0.8;
@@ -595,6 +598,15 @@ class HumanoidFighter3D {
     if (Math.abs(this.x + this.dir * 1.8 - opponent.x) < 1.6) {
       const dmg = 8 * this.atkMult * (this.hiddenPowerActive ? 1.35 : 1.0);
       opponent.takeDamage(dmg); this.registerHit(opponent, dmg);
+    }
+  }
+
+  attackHeavy(opponent) {
+    if (this.animTimer > 0 || this.isBlocking) return;
+    this.state = 'heavy'; this.animTimer = 20; audio.playHit();
+    if (Math.abs(this.x + this.dir * 1.9 - opponent.x) < 1.7) {
+      const damage = 12 * this.atkMult * (this.hiddenPowerActive ? 1.2 : 1.0);
+      opponent.takeDamage(damage); this.registerHit(opponent, damage);
     }
   }
 
@@ -709,6 +721,7 @@ class Game3D {
     this.renderer.setSize(1200, 675);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    window.addEventListener('resize', () => this.resizeRenderer());
 
     // Iluminación 3D del Arena
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -728,6 +741,16 @@ class Game3D {
     this.arenaDecor = new THREE.Group();
     this.scene.add(this.arenaDecor);
     this.applyArena();
+  }
+
+  resizeRenderer() {
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    if (!width || !height || !this.renderer) return;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setSize(width, height, false);
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
   }
 
   populateSelects() {}
@@ -909,6 +932,24 @@ class Game3D {
   bindEvents() {
     window.addEventListener('keydown', e => { this.keys[e.code] = true; });
     window.addEventListener('keyup', e => { this.keys[e.code] = false; });
+    document.querySelectorAll('[data-touch-key]').forEach(button => {
+      const key = button.dataset.touchKey;
+      const release = event => {
+        event.preventDefault();
+        this.keys[key] = false;
+        button.classList.remove('is-pressed');
+      };
+      button.addEventListener('pointerdown', event => {
+        if (!this.isRunning) return;
+        event.preventDefault();
+        this.keys[key] = true;
+        button.classList.add('is-pressed');
+        button.setPointerCapture(event.pointerId);
+      });
+      button.addEventListener('pointerup', release);
+      button.addEventListener('pointercancel', release);
+      button.addEventListener('lostpointercapture', release);
+    });
 
     document.getElementById('btn-mode-infinite').addEventListener('click', () => {
       this.gameMode = 'infinite';
@@ -916,6 +957,7 @@ class Game3D {
       document.getElementById('btn-mode-versus').className = "px-6 py-2 bg-stone-900 text-stone-400 font-mk text-xs md:text-sm rounded-xl border border-stone-700 font-bold";
       document.getElementById('p2-header-badge').innerText = "RIVAL INFINITO (CPU AI)";
       document.querySelector('[data-player-two-wallet]').classList.add('hidden');
+      document.getElementById('touch-controls-p2').classList.add('hidden');
     });
 
     document.getElementById('btn-mode-versus').addEventListener('click', () => {
@@ -924,6 +966,7 @@ class Game3D {
       document.getElementById('btn-mode-infinite').className = "px-6 py-2 bg-stone-900 text-stone-400 font-mk text-xs md:text-sm rounded-xl border border-stone-700 font-bold";
       document.getElementById('p2-header-badge').innerText = "JUGADOR 2 (FLECHAS / TECLAS)";
       document.querySelector('[data-player-two-wallet]').classList.remove('hidden');
+      document.getElementById('touch-controls-p2').classList.remove('hidden');
     });
 
     document.getElementById('btn-start-fight').addEventListener('click', () => {
@@ -956,6 +999,21 @@ class Game3D {
     document.getElementById('btn-toggle-sound').addEventListener('click', () => {
       audio.enabled = !audio.enabled;
       document.getElementById('sound-text').innerText = audio.enabled ? "AUDIO ON" : "AUDIO OFF";
+      document.getElementById('sound-icon').classList.toggle('fa-volume-high', audio.enabled);
+      document.getElementById('sound-icon').classList.toggle('fa-volume-xmark', !audio.enabled);
+      if (audio.enabled && this.isRunning) audio.playBackgroundMusic();
+      else audio.stopBackgroundMusic();
+      if (!audio.enabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    });
+
+    document.getElementById('btn-device-mode').addEventListener('click', event => {
+      const phoneMode = document.body.classList.toggle('phone-mode');
+      const button = event.currentTarget;
+      button.setAttribute('aria-pressed', String(phoneMode));
+      document.getElementById('device-mode-text').innerText = phoneMode ? 'MODO COMPUTADOR' : 'MODO TELÉFONO';
+      document.getElementById('device-mode-icon').classList.toggle('fa-mobile-screen-button', !phoneMode);
+      document.getElementById('device-mode-icon').classList.toggle('fa-desktop', phoneMode);
+      requestAnimationFrame(() => this.resizeRenderer());
     });
 
     document.getElementById('btn-show-controls').addEventListener('click', () => { document.getElementById('modal-controls').classList.remove('hidden'); });
@@ -968,6 +1026,7 @@ class Game3D {
   startMatch() {
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-screen').classList.remove('hidden');
+    this.resizeRenderer();
     this.applyArena();
     this.projectiles.forEach(projectile => this.scene.remove(projectile.mesh));
     this.projectiles = [];
@@ -1032,6 +1091,7 @@ class Game3D {
     if (this.keys['KeyW'] && this.p1.isGrounded) { this.p1.vy = this.p1.jumpPower; this.p1.isGrounded = false; }
     this.p1.isBlocking = !!this.keys['KeyS'];
     if (this.keys['KeyJ']) this.p1.attackLight(this.p2, this.particles3D);
+    if (this.keys['KeyK']) this.p1.attackHeavy(this.p2);
     if (this.keys['KeyL']) this.p1.attackWeapon1(this.p2, this.particles3D);
     if (this.keys['KeyU']) this.p1.attackWeapon2(this.projectiles, this.scene);
     if (this.keys['KeyI']) this.p1.attackElemental(this.projectiles, this.scene);
@@ -1044,6 +1104,7 @@ class Game3D {
       if (this.keys['ArrowUp'] && this.p2.isGrounded) { this.p2.vy = this.p2.jumpPower; this.p2.isGrounded = false; }
       this.p2.isBlocking = !!this.keys['ArrowDown'];
       if (this.keys['Numpad1'] || this.keys['KeyF']) this.p2.attackLight(this.p1, this.particles3D);
+      if (this.keys['Numpad2'] || this.keys['KeyG']) this.p2.attackHeavy(this.p1);
       if (this.keys['Numpad3'] || this.keys['KeyH']) this.p2.attackWeapon1(this.p1, this.particles3D);
       if (this.keys['Numpad7'] || this.keys['KeyV']) this.p2.attackWeapon2(this.projectiles, this.scene);
       if (this.keys['KeyB']) this.p2.attackElemental(this.projectiles, this.scene);

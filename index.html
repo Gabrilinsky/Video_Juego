@@ -33,6 +33,10 @@
         <i class="fa-solid fa-volume-high text-amber-500 mr-2" id="sound-icon"></i>
         <span id="sound-text">AUDIO ON</span>
       </button>
+      <button id="btn-device-mode" type="button" aria-pressed="false" class="hidden md:flex px-3 py-1.5 bg-stone-900 hover:bg-stone-800 border border-stone-700 rounded-lg text-xs font-semibold items-center transition">
+        <i id="device-mode-icon" class="fa-solid fa-mobile-screen-button text-cyan-400 mr-2"></i>
+        <span id="device-mode-text">MODO TELÉFONO</span>
+      </button>
       <button id="btn-show-controls" class="px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-700 rounded-lg text-xs font-semibold text-red-200 transition flex items-center">
         <i class="fa-solid fa-keyboard mr-2 text-red-400"></i> CONTROLES
       </button>
@@ -96,7 +100,7 @@
       </div>
 
       <!-- REJILLA DE JUGADORES 1 Y 2 -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-2">
+      <div id="fighter-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-2">
         
         <!-- CUSTOM JUGADOR 1 -->
         <div class="bg-stone-900/80 border border-red-800/40 rounded-xl p-4 box-glow-red relative flex flex-col justify-between">
