@@ -47,3 +47,126 @@ body {
 .animate-pulse-fast { 
   animation: pulse-fast 1.2s infinite ease-in-out; 
 }
+
+.touch-control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  background: #171717;
+  color: #e5e7eb;
+  font-size: 13px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.touch-control-button:active,
+.touch-control-button.is-pressed {
+  background: #7f1d1d;
+  border-color: #fbbf24;
+  color: #fff;
+  transform: scale(0.96);
+}
+
+.touch-control-button.touch-attack {
+  min-height: 42px;
+  background: #2b1111;
+}
+
+.touch-control-button.touch-attack:active,
+.touch-control-button.touch-attack.is-pressed {
+  background: #991b1b;
+}
+
+@media (max-width: 767px) {
+  body {
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  header h1 {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  header > div:last-child {
+    margin-left: auto;
+  }
+
+  header button {
+    min-height: 40px;
+    padding: 8px 10px;
+  }
+
+  main {
+    align-items: flex-start;
+    padding: 8px;
+  }
+
+  #selection-screen {
+    max-height: calc(100dvh - 98px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px;
+  }
+
+  #game-screen {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  #canvas-wrapper {
+    aspect-ratio: 16 / 10;
+    max-height: 48dvh;
+  }
+
+  #threeCanvas {
+    touch-action: none;
+  }
+
+  #touch-controls {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .touch-player-controls {
+    min-width: 0;
+  }
+
+  #touch-controls .grid-cols-2 > .grid-cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #p1-combo-display,
+  #p2-combo-display {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    text-align: left;
+  }
+
+  #p1-combo-count,
+  #p2-combo-count {
+    font-size: 18px;
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  #canvas-wrapper {
+    max-height: 56dvh;
+  }
+
+  .touch-control-button {
+    min-height: 38px;
+  }
+}
