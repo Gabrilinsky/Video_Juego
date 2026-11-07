@@ -199,6 +199,22 @@ function create3DProjectileMesh(type, colorHex) {
   return group;
 }
 
+const WEAPON_STATS = {
+  katana: { damage: 20, reach: 2.35 }, sai: { damage: 17, reach: 1.85 },
+  spear: { damage: 22, reach: 2.9 }, nunchaku: { damage: 18, reach: 2.05 },
+  daggers: { damage: 16, reach: 1.75 }, nodachi: { damage: 25, reach: 2.55 },
+  hammer: { damage: 26, reach: 2.1 }, claws: { damage: 17, reach: 1.8 },
+  staff: { damage: 18, reach: 2.65 }, axe: { damage: 23, reach: 2.2 }
+};
+
+const WEAPON_NAMES = {
+  katana: 'Katana', sai: 'Sai doble', spear: 'Naginata', nunchaku: 'Nunchaku',
+  daggers: 'Dagas', nodachi: 'Nodachi', hammer: 'Martillo', claws: 'Garras',
+  staff: 'Baston', axe: 'Hacha'
+};
+
+const UPGRADE_COSTS = { damage: 75, reach: 90, rune: 180 };
+
 /* ==========================================================================
    3. CONSTRUCTOR DE ANATOMÍA HUMANOIDE 3D ARTICULADA (SKELETAL HIERARCHY)
    ========================================================================== */
@@ -210,6 +226,8 @@ class HumanoidFighter3D {
     this.moveSpeed = config.style === 'speedster' ? 0.22 : 0.17;
     this.jumpPower = 0.38;
     this.atkMult = config.style === 'heavy' ? 1.4 : 1.0;
+    this.weaponStats = WEAPON_STATS[config.weapon1] || WEAPON_STATS.katana;
+    this.weaponUpgrades = config.weaponUpgrades || { damage: 0, reach: 0, rune: 0 };
 
     this.x = isP2 ? 4 : -4; this.y = 0; this.z = 0;
     this.vx = 0; this.vy = 0;
@@ -232,6 +250,8 @@ class HumanoidFighter3D {
     const skinMat = new THREE.MeshStandardMaterial({ color: skinHex, roughness: 0.6 });
     const suitMat = new THREE.MeshStandardMaterial({ color: suitHex, roughness: 0.4, metalness: 0.3 });
     const armorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3, metalness: 0.8 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3, metalness: 0.8 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
 
     // Caderas / Pelvis (Root Joint)
     this.pelvis = new THREE.Group(); this.pelvis.position.y = 1.8; this.group.add(this.pelvis);
@@ -240,8 +260,14 @@ class HumanoidFighter3D {
 
     // Torso / Pecho
     this.torso = new THREE.Group(); this.torso.position.y = 0.3; this.pelvis.add(this.torso);
-    const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.9, 0.5), suitMat);
-    chestMesh.position.y = 0.45; chestMesh.castShadow = true; this.torso.add(chestMesh);
+    const chestMesh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 16), suitMat);
+    chestMesh.scale.set(0.9, 1.05, 0.58); chestMesh.position.y = 0.48; chestMesh.castShadow = true; this.torso.add(chestMesh);
+    const abdomenMesh = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 12), suitMat);
+    abdomenMesh.scale.set(0.9, 1.05, 0.72); abdomenMesh.position.y = 0.04; abdomenMesh.castShadow = true; this.torso.add(abdomenMesh);
+    for (const side of [-1, 1]) {
+      const shoulderMesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), suitMat);
+      shoulderMesh.position.set(side * 0.48, 0.68, 0); shoulderMesh.castShadow = true; this.torso.add(shoulderMesh);
+    }
 
     // Adornos según Traje 3D (Samurái, Cíborg, Asesino, Caballero)
     if (this.config.outfit === 'samurai') {
@@ -274,6 +300,29 @@ class HumanoidFighter3D {
     this.headGroup = new THREE.Group(); this.headGroup.position.y = 1.05; this.torso.add(this.headGroup);
     const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 16), skinMat);
     headMesh.castShadow = true; this.headGroup.add(headMesh);
+    const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x171717, roughness: 0.3 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0x211810, roughness: 0.9 });
+    if (['ninja', 'cyborg', 'monk'].includes(this.config.outfit)) {
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.285, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.48), hairMat);
+      hair.position.y = 0.045; this.headGroup.add(hair);
+    }
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), skinMat);
+      ear.position.set(side * 0.27, -0.015, 0); this.headGroup.add(ear);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.043, 10, 8), eyeWhiteMat);
+      eye.scale.set(1, 0.72, 0.7); eye.position.set(side * 0.095, 0.025, 0.275); this.headGroup.add(eye);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), eyeMat);
+      pupil.position.set(side * 0.095, 0.025, 0.306); this.headGroup.add(pupil);
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.025, 0.035), darkMat);
+      brow.position.set(side * 0.095, 0.09, 0.27); brow.rotation.z = side * -0.1; this.headGroup.add(brow);
+    }
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), skinMat);
+    nose.scale.set(0.75, 1.2, 0.7); nose.position.set(0, -0.035, 0.3); this.headGroup.add(nose);
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.018, 0.025), darkMat);
+    mouth.position.set(0, -0.13, 0.27); this.headGroup.add(mouth);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.22, 12), skinMat);
+    neck.position.y = 0.82; this.torso.add(neck);
 
     if (this.config.outfit === 'samurai') {
       const helmet = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.3, 8), armorMat); helmet.position.y = 0.22; this.headGroup.add(helmet);
@@ -308,6 +357,12 @@ class HumanoidFighter3D {
     const lUpperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.1, 0.5, 8), suitMat); lUpperArm.position.y = -0.25; lUpperArm.castShadow = true; this.leftShoulder.add(lUpperArm);
     this.leftForearm = new THREE.Group(); this.leftForearm.position.y = -0.5; this.leftShoulder.add(this.leftForearm);
     const lForearmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.5, 8), skinMat); lForearmMesh.position.y = -0.25; lForearmMesh.castShadow = true; this.leftForearm.add(lForearmMesh);
+    const leftPalm = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), skinMat);
+    leftPalm.scale.set(0.9, 1.1, 0.7); leftPalm.position.y = -0.5; this.leftForearm.add(leftPalm);
+    for (let finger = 0; finger < 4; finger++) {
+      const digit = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.032, 0.13, 6), skinMat);
+      digit.position.set((finger - 1.5) * 0.045, -0.61, 0.015); this.leftForearm.add(digit);
+    }
 
     // Brazo Derecho (Joint Hierarchy + Arma 3D)
     this.rightShoulder = new THREE.Group(); this.rightShoulder.position.set(0.55, 0.75, 0); this.torso.add(this.rightShoulder);
@@ -317,19 +372,37 @@ class HumanoidFighter3D {
     
     // Hand Node + Attached 3D Weapon
     this.rightHand = new THREE.Group(); this.rightHand.position.y = -0.5; this.rightForearm.add(this.rightHand);
+    const rightPalm = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), skinMat);
+    rightPalm.scale.set(0.9, 1.1, 0.7); this.rightHand.add(rightPalm);
+    for (let finger = 0; finger < 4; finger++) {
+      const digit = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.032, 0.13, 6), skinMat);
+      digit.position.set((finger - 1.5) * 0.045, -0.11, 0.015); this.rightHand.add(digit);
+    }
     const weapon3D = create3DWeapon(this.config.weapon1, auraHex);
-    weapon3D.rotation.x = Math.PI / 2; weapon3D.position.set(0, 0, 0.2); this.rightHand.add(weapon3D);
+    if (this.weaponUpgrades.rune) {
+      weapon3D.traverse(part => {
+        if (part.material && part.material.emissive) {
+          part.material.emissive.setHex(auraHex);
+          part.material.emissiveIntensity = 0.55;
+        }
+      });
+    }
+    weapon3D.position.set(0, 0, 0.2); this.rightHand.add(weapon3D);
 
     // Piernas (Joint Hierarchy: Thigh -> Calf -> Foot)
     this.leftThigh = new THREE.Group(); this.leftThigh.position.set(-0.25, -0.2, 0); this.pelvis.add(this.leftThigh);
     const lThighMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 0.65, 8), suitMat); lThighMesh.position.y = -0.32; lThighMesh.castShadow = true; this.leftThigh.add(lThighMesh);
     this.leftCalf = new THREE.Group(); this.leftCalf.position.y = -0.65; this.leftThigh.add(this.leftCalf);
     const lCalfMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.65, 8), armorMat); lCalfMesh.position.y = -0.32; lCalfMesh.castShadow = true; this.leftCalf.add(lCalfMesh);
+    const leftBoot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), darkMat);
+    leftBoot.scale.set(0.8, 0.65, 1.25); leftBoot.position.set(0, -0.62, 0.08); this.leftCalf.add(leftBoot);
 
     this.rightThigh = new THREE.Group(); this.rightThigh.position.set(0.25, -0.2, 0); this.pelvis.add(this.rightThigh);
     const rThighMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.11, 0.65, 8), suitMat); rThighMesh.position.y = -0.32; rThighMesh.castShadow = true; this.rightThigh.add(rThighMesh);
     this.rightCalf = new THREE.Group(); this.rightCalf.position.y = -0.65; this.rightThigh.add(this.rightCalf);
     const rCalfMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.65, 8), armorMat); rCalfMesh.position.y = -0.32; rCalfMesh.castShadow = true; this.rightCalf.add(rCalfMesh);
+    const rightBoot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), darkMat);
+    rightBoot.scale.set(0.8, 0.65, 1.25); rightBoot.position.set(0, -0.62, 0.08); this.rightCalf.add(rightBoot);
 
     // Escudo 3D de Bloqueo
     const shieldGeo = new THREE.SphereGeometry(1.3, 16, 16);
@@ -348,6 +421,7 @@ class HumanoidFighter3D {
   }
 
   takeDamage(amount) {
+    amount *= 0.6;
     if (this.isBlocking) {
       amount *= 0.2; audio.playBlock();
     } else {
@@ -379,7 +453,7 @@ class HumanoidFighter3D {
 
     // Orientación hacia el Oponente
     this.dir = this.x < opponent.x ? 1 : -1;
-    this.group.rotation.y = this.dir === 1 ? Math.PI / 2 : -Math.PI / 2;
+    this.group.rotation.y = this.dir === 1 ? Math.PI / 4 : -Math.PI / 4;
 
     // Visibilidad de Escudo y Aura
     this.shieldMesh.material.opacity = this.isBlocking ? 0.35 : 0;
@@ -468,8 +542,10 @@ class HumanoidFighter3D {
   attackWeapon1(opponent, particles3D) {
     if (this.animTimer > 0 || this.isBlocking) return;
     this.state = 'weapon1'; this.animTimer = 22; audio.playSlash();
-    if (Math.abs(this.x + this.dir * 2.2 - opponent.x) < 2.0) {
-      const dmg = 20 * this.atkMult * (this.hiddenPowerActive ? 1.4 : 1.0);
+    if (Math.abs(this.x - opponent.x) < this.weaponStats.reach + this.weaponUpgrades.reach * 0.3) {
+      const weaponMultiplier = 1 + this.weaponUpgrades.damage * 0.12;
+      const runeDamage = this.weaponUpgrades.rune ? 7 : 0;
+      const dmg = (this.weaponStats.damage * weaponMultiplier + runeDamage) * this.atkMult * (this.hiddenPowerActive ? 1.4 : 1.0);
       opponent.takeDamage(dmg); this.registerHit(opponent, dmg);
     }
   }
@@ -544,10 +620,13 @@ class Game3D {
     this.container = document.getElementById('canvas-wrapper');
     this.canvas = document.getElementById('threeCanvas');
     this.timer = 99; this.gameMode = 'tower'; this.towerStage = 1; this.isRunning = false;
-    this.p1RoundWins = 0; this.p2RoundWins = 0; this.matchWinner = null;
+    this.matchWinner = null;
     this.projectiles = []; this.particles3D = []; this.keys = {};
+    this.weaponUpgrades = this.loadWeaponUpgrades();
+    this.coins = this.loadCoins();
 
     this.initThree();
+    this.updateCoinDisplays();
     this.populateSelects();
     this.bindEvents();
   }
@@ -586,6 +665,87 @@ class Game3D {
   }
 
   populateSelects() {}
+
+  loadWeaponUpgrades() {
+    try {
+      return JSON.parse(localStorage.getItem('shadowKombatWeaponUpgrades') || '{}');
+    } catch (error) {
+      return {};
+    }
+  }
+
+  getWeaponUpgrades(weapon) {
+    return this.weaponUpgrades[weapon] || { damage: 0, reach: 0, rune: 0 };
+  }
+
+  loadCoins() {
+    try {
+      const savedCoins = Number(localStorage.getItem('shadowKombatCoins') || 0);
+      return Number.isFinite(savedCoins) ? Math.max(0, savedCoins) : 0;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  saveCoins() {
+    try {
+      localStorage.setItem('shadowKombatCoins', String(this.coins));
+    } catch (error) {
+      // Las monedas siguen disponibles durante esta sesion si el almacenamiento no esta disponible.
+    }
+  }
+
+  updateCoinDisplays() {
+    document.querySelectorAll('[data-coin-balance]').forEach(display => {
+      display.innerText = this.coins;
+    });
+  }
+
+  saveWeaponUpgrades() {
+    try {
+      localStorage.setItem('shadowKombatWeaponUpgrades', JSON.stringify(this.weaponUpgrades));
+    } catch (error) {
+      // La progresion sigue activa durante esta sesion si el almacenamiento no esta disponible.
+    }
+  }
+
+  showWeaponUpgrades() {
+    const panel = document.getElementById('weapon-upgrade-panel');
+    const weapon = this.p1.config.weapon1;
+    const upgrades = this.getWeaponUpgrades(weapon);
+    document.getElementById('weapon-upgrade-name').innerText = WEAPON_NAMES[weapon] || 'Arma';
+    document.getElementById('weapon-upgrade-rank').innerText = `NIVEL ${1 + upgrades.damage + upgrades.reach + upgrades.rune}`;
+    document.getElementById('weapon-upgrade-status').innerText = `Monedas disponibles: ${this.coins}`;
+    document.querySelectorAll('[data-coin-balance]').forEach(display => {
+      display.innerText = this.coins;
+    });
+    panel.classList.remove('hidden');
+    panel.querySelectorAll('[data-upgrade]').forEach(button => {
+      const type = button.dataset.upgrade;
+      const limit = type === 'damage' ? 3 : type === 'reach' ? 2 : 1;
+      const level = upgrades[type] || 0;
+      const cost = UPGRADE_COSTS[type];
+      button.disabled = level >= limit || this.coins < cost;
+      button.querySelector('[data-upgrade-level]').innerText = level >= limit ? 'MAX' : `Nivel ${level} -> ${level + 1}`;
+      button.querySelector('[data-upgrade-cost]').innerText = level >= limit ? 'COMPLETO' : `${cost} monedas`;
+    });
+  }
+
+  applyWeaponUpgrade(type) {
+    if (!this.p1 || !this.p1.config.weapon1 || !UPGRADE_COSTS[type]) return;
+    const weapon = this.p1.config.weapon1;
+    const upgrades = this.getWeaponUpgrades(weapon);
+    const limit = type === 'damage' ? 3 : type === 'reach' ? 2 : 1;
+    const cost = UPGRADE_COSTS[type];
+    if ((upgrades[type] || 0) >= limit || this.coins < cost) return;
+    this.coins -= cost;
+    upgrades[type] = (upgrades[type] || 0) + 1;
+    this.weaponUpgrades[weapon] = upgrades;
+    this.saveWeaponUpgrades();
+    this.saveCoins();
+    this.updateCoinDisplays();
+    this.showWeaponUpgrades();
+  }
 
   applyArena() {
     const arenas = {
@@ -664,16 +824,15 @@ class Game3D {
     });
 
     document.getElementById('btn-start-fight').addEventListener('click', () => {
-      this.towerStage = 1; this.p1RoundWins = 0; this.p2RoundWins = 0; this.matchWinner = null; this.startMatch();
+      this.towerStage = 1; this.matchWinner = null; this.startMatch();
     });
 
     document.getElementById('btn-rematch').addEventListener('click', () => {
       document.getElementById('modal-victory').classList.add('hidden');
-      if (this.matchWinner) {
-        if (this.gameMode === 'tower' && this.matchWinner === 1 && this.towerStage < 5) this.towerStage++;
-        else if (this.gameMode === 'tower' && this.matchWinner === 1 && this.towerStage === 5) this.towerStage = 1;
-        this.p1RoundWins = 0; this.p2RoundWins = 0; this.matchWinner = null;
+      if (this.gameMode === 'tower' && this.matchWinner === 1) {
+        this.towerStage = this.towerStage < 5 ? this.towerStage + 1 : 1;
       }
+      this.matchWinner = null;
       this.startMatch();
     });
 
@@ -690,6 +849,9 @@ class Game3D {
 
     document.getElementById('btn-show-controls').addEventListener('click', () => { document.getElementById('modal-controls').classList.remove('hidden'); });
     document.getElementById('btn-close-controls').addEventListener('click', () => { document.getElementById('modal-controls').classList.add('hidden'); });
+    document.querySelectorAll('[data-upgrade]').forEach(button => {
+      button.addEventListener('click', () => this.applyWeaponUpgrade(button.dataset.upgrade));
+    });
   }
 
   startMatch() {
@@ -703,7 +865,8 @@ class Game3D {
     if (this.p1) this.scene.remove(this.p1.group);
     if (this.p2) this.scene.remove(this.p2.group);
 
-    const p1Cfg = { outfit: document.getElementById('p1-outfit').value, element: document.getElementById('p1-element').value, weapon1: document.getElementById('p1-weapon1').value, weapon2: document.getElementById('p1-weapon2').value, style: document.getElementById('p1-style').value, colorSkin: document.getElementById('p1-color-skin').value, colorSuit: document.getElementById('p1-color-suit').value, colorAura: document.getElementById('p1-color-aura').value };
+    const p1Weapon = document.getElementById('p1-weapon1').value;
+    const p1Cfg = { outfit: document.getElementById('p1-outfit').value, element: document.getElementById('p1-element').value, weapon1: p1Weapon, weapon2: document.getElementById('p1-weapon2').value, weaponUpgrades: this.getWeaponUpgrades(p1Weapon), style: document.getElementById('p1-style').value, colorSkin: document.getElementById('p1-color-skin').value, colorSuit: document.getElementById('p1-color-suit').value, colorAura: document.getElementById('p1-color-aura').value };
     this.p1 = new HumanoidFighter3D(1, p1Cfg, false, this.scene);
 
     if (this.gameMode === 'tower') {
@@ -717,13 +880,14 @@ class Game3D {
       document.getElementById('hud-p2-name').innerText = "JUGADOR 2";
     }
 
+    const upgrades = this.getWeaponUpgrades(p1Weapon);
+    document.getElementById('hud-p1-weapon').innerText = `${WEAPON_NAMES[p1Weapon] || 'Arma'} · NIV ${1 + upgrades.damage + upgrades.reach + upgrades.rune}`;
+
     this.timer = 99; this.isRunning = true;
     this.lastTimerTick = performance.now();
     document.getElementById('game-timer').innerText = this.timer;
-    const roundNumber = this.p1RoundWins + this.p2RoundWins + 1;
-    const roundTotal = Number(document.getElementById('select-rounds').value);
     const stageLabel = this.gameMode === 'tower' ? `TORRE ${this.towerStage}/5 · ` : '';
-    document.getElementById('tower-stage-badge').innerText = `${stageLabel}RONDA ${roundNumber}/${roundTotal}`;
+    document.getElementById('tower-stage-badge').innerText = `${stageLabel}COMBATE ÚNICO`;
     audio.speak("FIGHT!");
     requestAnimationFrame(() => this.loop());
   }
@@ -816,23 +980,27 @@ class Game3D {
   }
 
   endGame() {
+    if (!this.isRunning) return;
     this.isRunning = false;
     const p1Wins = this.timer === 0 ? this.p1.hp >= this.p2.hp : this.p1.hp > 0;
-    if (p1Wins) this.p1RoundWins++;
-    else this.p2RoundWins++;
-    const roundsToWin = Math.ceil(Number(document.getElementById('select-rounds').value) / 2);
-    if (this.p1RoundWins >= roundsToWin) this.matchWinner = 1;
-    else if (this.p2RoundWins >= roundsToWin) this.matchWinner = 2;
+    this.matchWinner = p1Wins ? 1 : 2;
+    if (p1Wins) {
+      this.coins += 100;
+      this.saveCoins();
+      this.updateCoinDisplays();
+    }
 
     audio.speak(p1Wins ? "FINISH HIM! JUGADOR 1 VICTORIOSO EN 3D" : "GAME OVER");
-    const matchFinished = this.matchWinner !== null;
-    document.getElementById('victory-title').innerText = matchFinished
-      ? (this.matchWinner === 1 ? "¡SERIE GANADA!" : "¡SERIE PERDIDA!")
-      : (p1Wins ? "¡RONDA GANADA!" : "¡RONDA PERDIDA!");
-    document.getElementById('victory-subtitle').innerText = `MARCADOR ${this.p1RoundWins} - ${this.p2RoundWins}`;
-    document.getElementById('btn-rematch').innerText = matchFinished
-      ? (this.gameMode === 'tower' && this.matchWinner === 1 ? "SIGUIENTE COMBATE 3D" : "NUEVA SERIE")
-      : "SIGUIENTE RONDA";
+    document.getElementById('victory-title').innerText = p1Wins ? "¡COMBATE GANADO!" : "¡COMBATE PERDIDO!";
+    document.getElementById('victory-subtitle').innerText = p1Wins
+      ? "+100 MONEDAS · PUEDES MEJORAR TU ARMA"
+      : `BOLSA: ${this.coins} MONEDAS`;
+    const upgradePanel = document.getElementById('weapon-upgrade-panel');
+    upgradePanel.classList.add('hidden');
+    if (p1Wins) this.showWeaponUpgrades();
+    document.getElementById('btn-rematch').innerText = this.gameMode === 'tower' && p1Wins
+      ? "SIGUIENTE COMBATE"
+      : (p1Wins ? "REVANCHA" : "REINTENTAR COMBATE");
     document.getElementById('modal-victory').classList.remove('hidden');
   }
 }

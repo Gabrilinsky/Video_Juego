@@ -82,13 +82,11 @@
             <option value="EXTREMO">Extremo Maestro</option>
           </select>
         </div>
-        <div class="bg-stone-900/90 border border-stone-800 rounded-xl p-2.5 flex items-center justify-between md:col-span-2">
-          <label for="select-rounds" class="text-xs font-bold text-amber-400 font-mk"><i class="fa-solid fa-layer-group mr-2"></i> RONDAS:</label>
-          <select id="select-rounds" class="bg-stone-950 border border-amber-600/60 rounded px-3 py-1 text-xs text-amber-200 font-bold outline-none">
-            <option value="1">1 ronda</option>
-            <option value="3" selected>Mejor de 3</option>
-            <option value="5">Mejor de 5</option>
-          </select>
+      </div>
+
+      <div class="flex justify-center mb-3">
+        <div class="flex items-center gap-2 rounded-lg border border-amber-700/60 bg-amber-950/30 px-4 py-2 text-xs font-bold text-amber-300">
+          <i class="fa-solid fa-coins"></i><span>MONEDAS:</span><span data-coin-balance>0</span>
         </div>
       </div>
 
@@ -314,6 +312,7 @@
             </div>
             <span id="hud-p1-super-text" class="text-[10px] text-amber-300 font-bold">0%</span>
           </div>
+          <div id="hud-p1-weapon" class="text-[10px] text-stone-400 uppercase tracking-wide">Katana · NIV 1</div>
         </div>
 
         <!-- RELOJ Y STAGE -->
@@ -407,7 +406,7 @@
 
   <!-- MODAL DE VICTORIA / DERROTA -->
   <div id="modal-victory" class="fixed inset-0 bg-black/85 backdrop-blur-lg z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-stone-950 border-2 border-amber-500 rounded-2xl p-6 max-w-lg w-full text-center shadow-2xl box-glow-red">
+    <div class="bg-stone-950 border-2 border-amber-500 rounded-2xl p-6 max-h-[90vh] overflow-y-auto max-w-lg w-full text-center shadow-2xl box-glow-red">
       <i class="fa-solid fa-trophy text-5xl text-amber-400 mb-2 animate-pulse-fast glow-gold"></i>
       <h2 id="victory-title" class="font-mk text-4xl text-red-600 glow-red">¡FINISH HIM!</h2>
       <p id="victory-subtitle" class="text-lg text-amber-300 font-bold mt-1">EL JUGADOR 1 DOMINA LA ARENA 3D</p>
@@ -417,6 +416,35 @@
         <div class="flex justify-between"><span>Daño Total Infligido:</span> <span id="stat-total-dmg" class="text-red-400 font-bold">480 HP</span></div>
         <div class="flex justify-between"><span>Super Finishers Ejecutados:</span> <span id="stat-ultimates" class="text-cyan-400 font-bold">1</span></div>
       </div>
+
+      <section id="weapon-upgrade-panel" class="hidden mb-5 text-left">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-mk text-sm text-amber-300">TIENDA DE ARMAS</h3>
+          <span class="text-[10px] text-amber-300"><i class="fa-solid fa-coins mr-1"></i><span data-coin-balance>0</span> MONEDAS</span>
+        </div>
+        <p id="weapon-upgrade-status" class="text-[10px] text-stone-400 mb-2">Elige una mejora para tu arma.</p>
+        <div class="text-[10px] text-stone-400 mb-2"><span id="weapon-upgrade-name">Katana</span> · <span id="weapon-upgrade-rank">NIVEL 1</span></div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button data-upgrade="damage" class="weapon-upgrade-option border border-red-800/70 bg-red-950/40 hover:bg-red-900/70 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg p-2 text-left transition">
+            <span class="block text-xs font-bold text-red-200"><i class="fa-solid fa-bolt mr-1"></i>Filo reforzado</span>
+            <span class="block text-[10px] text-stone-400">Aumenta el daño del arma</span>
+            <span data-upgrade-level class="block mt-1 text-[10px] text-amber-300">Nivel 0 -> 1</span>
+            <span data-upgrade-cost class="block text-[10px] text-amber-200">75 monedas</span>
+          </button>
+          <button data-upgrade="reach" class="weapon-upgrade-option border border-cyan-800/70 bg-cyan-950/30 hover:bg-cyan-900/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg p-2 text-left transition">
+            <span class="block text-xs font-bold text-cyan-200"><i class="fa-solid fa-arrows-left-right mr-1"></i>Hoja extendida</span>
+            <span class="block text-[10px] text-stone-400">Aumenta el alcance</span>
+            <span data-upgrade-level class="block mt-1 text-[10px] text-amber-300">Nivel 0 -> 1</span>
+            <span data-upgrade-cost class="block text-[10px] text-amber-200">90 monedas</span>
+          </button>
+          <button data-upgrade="rune" class="weapon-upgrade-option border border-amber-700/70 bg-amber-950/30 hover:bg-amber-900/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg p-2 text-left transition">
+            <span class="block text-xs font-bold text-amber-200"><i class="fa-solid fa-sun mr-1"></i>Runa elemental</span>
+            <span class="block text-[10px] text-stone-400">Daño extra y brillo elemental</span>
+            <span data-upgrade-level class="block mt-1 text-[10px] text-amber-300">Nivel 0 -> 1</span>
+            <span data-upgrade-cost class="block text-[10px] text-amber-200">180 monedas</span>
+          </button>
+        </div>
+      </section>
 
       <div class="flex space-x-3 justify-center">
         <button id="btn-rematch" class="px-5 py-2.5 bg-red-700 hover:bg-red-600 text-white font-mk text-sm rounded-xl font-bold transition shadow-lg">
