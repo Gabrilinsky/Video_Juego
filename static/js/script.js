@@ -5,6 +5,8 @@ class SoundEngine {
   constructor() {
     this.ctx = null;
     this.enabled = true;
+    this.musicTimer = null;
+    this.musicStep = 0;
   }
   init() {
     if (!this.ctx) {
@@ -67,6 +69,56 @@ class SoundEngine {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
     osc.connect(gain); gain.connect(this.ctx.destination);
     osc.start(now); osc.stop(now + 0.2);
+  }
+  playBackgroundMusic() {
+    if (!this.enabled || this.musicTimer) return;
+    this.init();
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const bassNotes = [55, 55, 49, 55, 65, 58, 49, 55];
+    const leadNotes = [110, 0, 130.81, 0, 146.83, 0, 116.54, 0];
+    this.musicTimer = window.setInterval(() => {
+      if (!this.enabled) return;
+      const now = this.ctx.currentTime;
+      const step = this.musicStep++ % bassNotes.length;
+      const bass = this.ctx.createOscillator();
+      const bassGain = this.ctx.createGain();
+      bass.type = 'triangle';
+      bass.frequency.setValueAtTime(bassNotes[step], now);
+      bassGain.gain.setValueAtTime(0.0001, now);
+      bassGain.gain.exponentialRampToValueAtTime(0.035, now + 0.025);
+      bassGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      bass.connect(bassGain); bassGain.connect(this.ctx.destination);
+      bass.start(now); bass.stop(now + 0.23);
+
+      if (leadNotes[step]) {
+        const lead = this.ctx.createOscillator();
+        const leadGain = this.ctx.createGain();
+        lead.type = 'sine';
+        lead.frequency.setValueAtTime(leadNotes[step], now);
+        leadGain.gain.setValueAtTime(0.0001, now);
+        leadGain.gain.exponentialRampToValueAtTime(0.018, now + 0.02);
+        leadGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+        lead.connect(leadGain); leadGain.connect(this.ctx.destination);
+        lead.start(now); lead.stop(now + 0.19);
+      }
+
+      if (step % 4 === 0) {
+        const drum = this.ctx.createOscillator();
+        const drumGain = this.ctx.createGain();
+        drum.type = 'sine';
+        drum.frequency.setValueAtTime(95, now);
+        drum.frequency.exponentialRampToValueAtTime(38, now + 0.12);
+        drumGain.gain.setValueAtTime(0.06, now);
+        drumGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
+        drum.connect(drumGain); drumGain.connect(this.ctx.destination);
+        drum.start(now); drum.stop(now + 0.14);
+      }
+    }, 240);
+  }
+  stopBackgroundMusic() {
+    if (this.musicTimer) window.clearInterval(this.musicTimer);
+    this.musicTimer = null;
+    this.musicStep = 0;
   }
   speak(text) {
     if (!this.enabled || !('speechSynthesis' in window)) return;
@@ -207,13 +259,18 @@ const WEAPON_STATS = {
   staff: { damage: 18, reach: 2.65 }, axe: { damage: 23, reach: 2.2 }
 };
 
+const RANGED_WEAPON_STATS = {
+  shuriken: 14, chakram: 16, kunai: 13, smoke: 10, bolt: 17, orb: 15
+};
+
+const UPGRADE_COSTS = { damage: 75, reach: 90, rune: 180, ranged: 100, power: 120 };
+const UPGRADE_LIMITS = { damage: 3, reach: 2, rune: 1, ranged: 3, power: 3 };
+
 const WEAPON_NAMES = {
   katana: 'Katana', sai: 'Sai doble', spear: 'Naginata', nunchaku: 'Nunchaku',
   daggers: 'Dagas', nodachi: 'Nodachi', hammer: 'Martillo', claws: 'Garras',
   staff: 'Baston', axe: 'Hacha'
 };
-
-const UPGRADE_COSTS = { damage: 75, reach: 90, rune: 180 };
 
 /* ==========================================================================
    3. CONSTRUCTOR DE ANATOMÍA HUMANOIDE 3D ARTICULADA (SKELETAL HIERARCHY)
@@ -222,12 +279,14 @@ class HumanoidFighter3D {
   constructor(id, config, isP2 = false, scene = null) {
     this.id = id; this.isP2 = isP2; this.config = config; this.scene = scene;
 
-    this.hpMax = 100; this.hp = 100; this.superMeter = 0;
+    this.hpMax = config.hpMax || 100; this.hp = this.hpMax; this.superMeter = 0;
     this.moveSpeed = config.style === 'speedster' ? 0.22 : 0.17;
     this.jumpPower = 0.38;
-    this.atkMult = config.style === 'heavy' ? 1.4 : 1.0;
+    this.atkMult = (config.style === 'heavy' ? 1.4 : 1.0) * (config.combatMultiplier || 1);
     this.weaponStats = WEAPON_STATS[config.weapon1] || WEAPON_STATS.katana;
     this.weaponUpgrades = config.weaponUpgrades || { damage: 0, reach: 0, rune: 0 };
+    this.rangedUpgrades = config.rangedUpgrades || { ranged: 0 };
+    this.powerUpgrades = config.powerUpgrades || { power: 0 };
 
     this.x = isP2 ? 4 : -4; this.y = 0; this.z = 0;
     this.vx = 0; this.vy = 0;
@@ -557,11 +616,15 @@ class HumanoidFighter3D {
     const projMesh = create3DProjectileMesh(this.config.weapon2, auraHex);
     projMesh.position.set(this.x + this.dir * 0.8, this.y + 1.6, this.z);
     scene.add(projMesh);
-    projectiles.push({ mesh: projMesh, owner: this, dir: this.dir, speed: 0.35, active: true });
+    const baseDamage = RANGED_WEAPON_STATS[this.config.weapon2] || 14;
+    const damage = baseDamage * (1 + this.rangedUpgrades.ranged * 0.12);
+    projectiles.push({ mesh: projMesh, owner: this, dir: this.dir, speed: 0.35, active: true, damage });
   }
 
   attackElemental(projectiles, scene) {
-    if (this.superMeter < 25 || this.animTimer > 0 || this.isBlocking) return;
+    const powerLevel = this.powerUpgrades.power || 0;
+    const meterCost = Math.max(10, 25 - powerLevel * 5);
+    if (this.superMeter < meterCost || this.animTimer > 0 || this.isBlocking) return;
     const elementColors = {
       fire: 0xff4b1f, ice: 0x67e8f9, lightning: 0xfacc15,
       shadow: 0xa855f7, solar: 0xfbbf24, wind: 0x4ade80,
@@ -581,7 +644,7 @@ class HumanoidFighter3D {
       arcane: () => new THREE.OctahedronGeometry(0.4),
       metal: () => new THREE.BoxGeometry(0.52, 0.52, 0.52)
     };
-    this.superMeter -= 25;
+    this.superMeter -= meterCost;
     this.state = 'elemental'; this.animTimer = 24;
     audio.playProjectile();
     const color = elementColors[this.config.element] || 0xffffff;
@@ -590,14 +653,14 @@ class HumanoidFighter3D {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(this.x + this.dir * 0.9, this.y + 1.5, this.z);
     scene.add(mesh);
-    projectiles.push({ mesh, owner: this, dir: this.dir, speed: 0.5, active: true, damage: 22 });
+    projectiles.push({ mesh, owner: this, dir: this.dir, speed: 0.5, active: true, damage: 16 + powerLevel * 3 });
   }
 
   attackUltimate(opponent, particles3D, camera) {
     if (this.superMeter < 100 || this.animTimer > 0 || this.isBlocking) return;
     this.superMeter = 0; this.state = 'ultimate'; this.animTimer = 60; this.ultimatesUsed++;
     audio.speak("SUPER FINISHER!");
-    const damage = 48 * this.atkMult;
+    const damage = (32 + (this.powerUpgrades.power || 0) * 4) * this.atkMult;
     audio.playSlash();
     opponent.takeDamage(damage);
     this.registerHit(opponent, damage);
@@ -619,11 +682,14 @@ class Game3D {
   constructor() {
     this.container = document.getElementById('canvas-wrapper');
     this.canvas = document.getElementById('threeCanvas');
-    this.timer = 99; this.gameMode = 'tower'; this.towerStage = 1; this.isRunning = false;
+    this.timer = 99; this.gameMode = 'infinite'; this.infiniteRound = 1; this.isRunning = false;
     this.matchWinner = null;
     this.projectiles = []; this.particles3D = []; this.keys = {};
-    this.weaponUpgrades = this.loadWeaponUpgrades();
-    this.coins = this.loadCoins();
+    this.shopPlayerId = 1;
+    this.playerProgress = {
+      1: { coins: this.loadCoins(1), upgrades: this.loadWeaponUpgrades(1) },
+      2: { coins: this.loadCoins(2), upgrades: this.loadWeaponUpgrades(2) }
+    };
 
     this.initThree();
     this.updateCoinDisplays();
@@ -666,30 +732,49 @@ class Game3D {
 
   populateSelects() {}
 
-  loadWeaponUpgrades() {
+  loadWeaponUpgrades(playerId) {
     try {
-      return JSON.parse(localStorage.getItem('shadowKombatWeaponUpgrades') || '{}');
+      const key = playerId === 1 ? 'shadowKombatWeaponUpgrades' : 'shadowKombatWeaponUpgradesP2';
+      return JSON.parse(localStorage.getItem(key) || '{}');
     } catch (error) {
       return {};
     }
   }
 
-  getWeaponUpgrades(weapon) {
-    return this.weaponUpgrades[weapon] || { damage: 0, reach: 0, rune: 0 };
+  getUpgradeSet(item, playerId, category) {
+    const saved = this.playerProgress[playerId].upgrades;
+    return saved[`${category}:${item}`] || (category === 'melee' && saved[item]) || {};
   }
 
-  loadCoins() {
+  getUpgradeTarget(type, fighter) {
+    if (type === 'ranged') return { category: 'ranged', item: fighter.config.weapon2 };
+    if (type === 'power') return { category: 'power', item: fighter.config.element };
+    return { category: 'melee', item: fighter.config.weapon1 };
+  }
+
+  getFighterUpgradeLevel(fighter, playerId) {
+    const sets = [
+      this.getUpgradeSet(fighter.config.weapon1, playerId, 'melee'),
+      this.getUpgradeSet(fighter.config.weapon2, playerId, 'ranged'),
+      this.getUpgradeSet(fighter.config.element, playerId, 'power')
+    ];
+    return 1 + sets.reduce((total, upgrades) => total + Object.values(upgrades).reduce((sum, level) => sum + level, 0), 0);
+  }
+
+  loadCoins(playerId) {
     try {
-      const savedCoins = Number(localStorage.getItem('shadowKombatCoins') || 0);
+      const key = playerId === 1 ? 'shadowKombatCoins' : 'shadowKombatCoinsP2';
+      const savedCoins = Number(localStorage.getItem(key) || 0);
       return Number.isFinite(savedCoins) ? Math.max(0, savedCoins) : 0;
     } catch (error) {
       return 0;
     }
   }
 
-  saveCoins() {
+  saveCoins(playerId) {
     try {
-      localStorage.setItem('shadowKombatCoins', String(this.coins));
+      const key = playerId === 1 ? 'shadowKombatCoins' : 'shadowKombatCoinsP2';
+      localStorage.setItem(key, String(this.playerProgress[playerId].coins));
     } catch (error) {
       // Las monedas siguen disponibles durante esta sesion si el almacenamiento no esta disponible.
     }
@@ -697,54 +782,70 @@ class Game3D {
 
   updateCoinDisplays() {
     document.querySelectorAll('[data-coin-balance]').forEach(display => {
-      display.innerText = this.coins;
+      const playerId = display.dataset.coinBalance === 'active' ? this.shopPlayerId : Number(display.dataset.coinBalance);
+      display.innerText = this.playerProgress[playerId].coins;
     });
   }
 
-  saveWeaponUpgrades() {
+  saveWeaponUpgrades(playerId) {
     try {
-      localStorage.setItem('shadowKombatWeaponUpgrades', JSON.stringify(this.weaponUpgrades));
+      const key = playerId === 1 ? 'shadowKombatWeaponUpgrades' : 'shadowKombatWeaponUpgradesP2';
+      localStorage.setItem(key, JSON.stringify(this.playerProgress[playerId].upgrades));
     } catch (error) {
       // La progresion sigue activa durante esta sesion si el almacenamiento no esta disponible.
     }
   }
 
-  showWeaponUpgrades() {
+  resetWeaponUpgrades(playerId) {
+    this.playerProgress[playerId].upgrades = {};
+    this.saveWeaponUpgrades(playerId);
+  }
+
+  showWeaponUpgrades(playerId) {
+    this.shopPlayerId = playerId;
     const panel = document.getElementById('weapon-upgrade-panel');
-    const weapon = this.p1.config.weapon1;
-    const upgrades = this.getWeaponUpgrades(weapon);
-    document.getElementById('weapon-upgrade-name').innerText = WEAPON_NAMES[weapon] || 'Arma';
-    document.getElementById('weapon-upgrade-rank').innerText = `NIVEL ${1 + upgrades.damage + upgrades.reach + upgrades.rune}`;
-    document.getElementById('weapon-upgrade-status').innerText = `Monedas disponibles: ${this.coins}`;
-    document.querySelectorAll('[data-coin-balance]').forEach(display => {
-      display.innerText = this.coins;
-    });
+    const fighter = playerId === 1 ? this.p1 : this.p2;
+    const weapons = this.getUpgradeSet(fighter.config.weapon1, playerId, 'melee');
+    const ranged = this.getUpgradeSet(fighter.config.weapon2, playerId, 'ranged');
+    const powers = this.getUpgradeSet(fighter.config.element, playerId, 'power');
+    const totalLevel = 1 + Object.values(weapons).reduce((sum, level) => sum + level, 0)
+      + Object.values(ranged).reduce((sum, level) => sum + level, 0)
+      + Object.values(powers).reduce((sum, level) => sum + level, 0);
+    document.getElementById('weapon-upgrade-player').innerText = `TIENDA JUGADOR ${playerId}`;
+    document.getElementById('weapon-upgrade-name').innerText = `${WEAPON_NAMES[fighter.config.weapon1] || 'Arma'} + ${fighter.config.weapon2}`;
+    document.getElementById('weapon-upgrade-rank').innerText = `NIVEL ${totalLevel}`;
+    document.getElementById('weapon-upgrade-status').innerText = `Monedas disponibles: ${this.playerProgress[playerId].coins}`;
+    this.updateCoinDisplays();
     panel.classList.remove('hidden');
     panel.querySelectorAll('[data-upgrade]').forEach(button => {
       const type = button.dataset.upgrade;
-      const limit = type === 'damage' ? 3 : type === 'reach' ? 2 : 1;
+      const target = this.getUpgradeTarget(type, fighter);
+      const upgrades = this.getUpgradeSet(target.item, playerId, target.category);
+      const limit = UPGRADE_LIMITS[type];
       const level = upgrades[type] || 0;
       const cost = UPGRADE_COSTS[type];
-      button.disabled = level >= limit || this.coins < cost;
+      button.disabled = level >= limit || this.playerProgress[playerId].coins < cost;
       button.querySelector('[data-upgrade-level]').innerText = level >= limit ? 'MAX' : `Nivel ${level} -> ${level + 1}`;
       button.querySelector('[data-upgrade-cost]').innerText = level >= limit ? 'COMPLETO' : `${cost} monedas`;
     });
   }
 
   applyWeaponUpgrade(type) {
-    if (!this.p1 || !this.p1.config.weapon1 || !UPGRADE_COSTS[type]) return;
-    const weapon = this.p1.config.weapon1;
-    const upgrades = this.getWeaponUpgrades(weapon);
-    const limit = type === 'damage' ? 3 : type === 'reach' ? 2 : 1;
+    const playerId = this.shopPlayerId;
+    const fighter = playerId === 1 ? this.p1 : this.p2;
+    if (!fighter || !UPGRADE_COSTS[type]) return;
+    const target = this.getUpgradeTarget(type, fighter);
+    const upgrades = this.getUpgradeSet(target.item, playerId, target.category);
+    const limit = UPGRADE_LIMITS[type];
     const cost = UPGRADE_COSTS[type];
-    if ((upgrades[type] || 0) >= limit || this.coins < cost) return;
-    this.coins -= cost;
+    if ((upgrades[type] || 0) >= limit || this.playerProgress[playerId].coins < cost) return;
+    this.playerProgress[playerId].coins -= cost;
     upgrades[type] = (upgrades[type] || 0) + 1;
-    this.weaponUpgrades[weapon] = upgrades;
-    this.saveWeaponUpgrades();
-    this.saveCoins();
+    this.playerProgress[playerId].upgrades[`${target.category}:${target.item}`] = upgrades;
+    this.saveWeaponUpgrades(playerId);
+    this.saveCoins(playerId);
     this.updateCoinDisplays();
-    this.showWeaponUpgrades();
+    this.showWeaponUpgrades(playerId);
   }
 
   applyArena() {
@@ -809,28 +910,38 @@ class Game3D {
     window.addEventListener('keydown', e => { this.keys[e.code] = true; });
     window.addEventListener('keyup', e => { this.keys[e.code] = false; });
 
-    document.getElementById('btn-mode-tower').addEventListener('click', () => {
-      this.gameMode = 'tower';
-      document.getElementById('btn-mode-tower').className = "px-6 py-2 bg-gradient-to-r from-amber-700 to-red-800 text-white font-mk text-xs md:text-sm rounded-xl border-2 border-amber-400 font-bold box-glow-gold";
+    document.getElementById('btn-mode-infinite').addEventListener('click', () => {
+      this.gameMode = 'infinite';
+      document.getElementById('btn-mode-infinite').className = "px-6 py-2 bg-gradient-to-r from-amber-700 to-red-800 text-white font-mk text-xs md:text-sm rounded-xl border-2 border-amber-400 font-bold box-glow-gold";
       document.getElementById('btn-mode-versus').className = "px-6 py-2 bg-stone-900 text-stone-400 font-mk text-xs md:text-sm rounded-xl border border-stone-700 font-bold";
-      document.getElementById('p2-header-badge').innerText = "OPONENTE TORRE (CPU AI)";
+      document.getElementById('p2-header-badge').innerText = "RIVAL INFINITO (CPU AI)";
+      document.querySelector('[data-player-two-wallet]').classList.add('hidden');
     });
 
     document.getElementById('btn-mode-versus').addEventListener('click', () => {
       this.gameMode = 'versus';
       document.getElementById('btn-mode-versus').className = "px-6 py-2 bg-gradient-to-r from-blue-700 to-cyan-800 text-white font-mk text-xs md:text-sm rounded-xl border-2 border-cyan-400 font-bold box-glow-blue";
-      document.getElementById('btn-mode-tower').className = "px-6 py-2 bg-stone-900 text-stone-400 font-mk text-xs md:text-sm rounded-xl border border-stone-700 font-bold";
+      document.getElementById('btn-mode-infinite').className = "px-6 py-2 bg-stone-900 text-stone-400 font-mk text-xs md:text-sm rounded-xl border border-stone-700 font-bold";
       document.getElementById('p2-header-badge').innerText = "JUGADOR 2 (FLECHAS / TECLAS)";
+      document.querySelector('[data-player-two-wallet]').classList.remove('hidden');
     });
 
     document.getElementById('btn-start-fight').addEventListener('click', () => {
-      this.towerStage = 1; this.matchWinner = null; this.startMatch();
+      this.infiniteRound = 1;
+      this.resetWeaponUpgrades(1);
+      this.resetWeaponUpgrades(2);
+      this.matchWinner = null;
+      this.startMatch();
     });
 
     document.getElementById('btn-rematch').addEventListener('click', () => {
       document.getElementById('modal-victory').classList.add('hidden');
-      if (this.gameMode === 'tower' && this.matchWinner === 1) {
-        this.towerStage = this.towerStage < 5 ? this.towerStage + 1 : 1;
+      if (this.gameMode === 'infinite') {
+        if (this.matchWinner === 1) this.infiniteRound++;
+        else {
+          this.infiniteRound = 1;
+          this.resetWeaponUpgrades(1);
+        }
       }
       this.matchWinner = null;
       this.startMatch();
@@ -866,29 +977,37 @@ class Game3D {
     if (this.p2) this.scene.remove(this.p2.group);
 
     const p1Weapon = document.getElementById('p1-weapon1').value;
-    const p1Cfg = { outfit: document.getElementById('p1-outfit').value, element: document.getElementById('p1-element').value, weapon1: p1Weapon, weapon2: document.getElementById('p1-weapon2').value, weaponUpgrades: this.getWeaponUpgrades(p1Weapon), style: document.getElementById('p1-style').value, colorSkin: document.getElementById('p1-color-skin').value, colorSuit: document.getElementById('p1-color-suit').value, colorAura: document.getElementById('p1-color-aura').value };
+    const p1RangedWeapon = document.getElementById('p1-weapon2').value;
+    const p1Element = document.getElementById('p1-element').value;
+    const p1Cfg = { outfit: document.getElementById('p1-outfit').value, element: p1Element, weapon1: p1Weapon, weapon2: p1RangedWeapon, weaponUpgrades: this.getUpgradeSet(p1Weapon, 1, 'melee'), rangedUpgrades: this.getUpgradeSet(p1RangedWeapon, 1, 'ranged'), powerUpgrades: this.getUpgradeSet(p1Element, 1, 'power'), style: document.getElementById('p1-style').value, colorSkin: document.getElementById('p1-color-skin').value, colorSuit: document.getElementById('p1-color-suit').value, colorAura: document.getElementById('p1-color-aura').value };
     this.p1 = new HumanoidFighter3D(1, p1Cfg, false, this.scene);
 
-    if (this.gameMode === 'tower') {
-      const isBoss = this.towerStage === 5;
-      const p2Cfg = isBoss ? { outfit: "samurai", element: "fire", weapon1: "spear", weapon2: "shuriken", style: "heavy", colorSkin: "#e2e8f0", colorSuit: "#eab308", colorAura: "#ff0000" } : { outfit: document.getElementById('p2-outfit').value, element: document.getElementById('p2-element').value, weapon1: document.getElementById('p2-weapon1').value, weapon2: document.getElementById('p2-weapon2').value, style: document.getElementById('p2-style').value, colorSkin: document.getElementById('p2-color-skin').value, colorSuit: document.getElementById('p2-color-suit').value, colorAura: document.getElementById('p2-color-aura').value };
+    const p2Weapon = document.getElementById('p2-weapon1').value;
+    const p2RangedWeapon = document.getElementById('p2-weapon2').value;
+    const p2Element = document.getElementById('p2-element').value;
+    const p2Cfg = { outfit: document.getElementById('p2-outfit').value, element: p2Element, weapon1: p2Weapon, weapon2: p2RangedWeapon, weaponUpgrades: this.getUpgradeSet(p2Weapon, 2, 'melee'), rangedUpgrades: this.getUpgradeSet(p2RangedWeapon, 2, 'ranged'), powerUpgrades: this.getUpgradeSet(p2Element, 2, 'power'), style: document.getElementById('p2-style').value, colorSkin: document.getElementById('p2-color-skin').value, colorSuit: document.getElementById('p2-color-suit').value, colorAura: document.getElementById('p2-color-aura').value };
+    if (this.gameMode === 'infinite') {
+      const scaling = Math.min(this.infiniteRound - 1, 40);
+      p2Cfg.hpMax = 100 + scaling * 2;
+      p2Cfg.combatMultiplier = 1 + scaling * 0.02;
       this.p2 = new HumanoidFighter3D(2, p2Cfg, true, this.scene);
-      document.getElementById('hud-p2-name').innerText = isBoss ? "EMPERADOR KAHN 3D" : `TORRE NIVEL ${this.towerStage}/5`;
+      document.getElementById('hud-p2-name').innerText = `RIVAL RONDA ${this.infiniteRound}`;
     } else {
-      const p2Cfg = { outfit: document.getElementById('p2-outfit').value, element: document.getElementById('p2-element').value, weapon1: document.getElementById('p2-weapon1').value, weapon2: document.getElementById('p2-weapon2').value, style: document.getElementById('p2-style').value, colorSkin: document.getElementById('p2-color-skin').value, colorSuit: document.getElementById('p2-color-suit').value, colorAura: document.getElementById('p2-color-aura').value };
       this.p2 = new HumanoidFighter3D(2, p2Cfg, true, this.scene);
       document.getElementById('hud-p2-name').innerText = "JUGADOR 2";
     }
 
-    const upgrades = this.getWeaponUpgrades(p1Weapon);
-    document.getElementById('hud-p1-weapon').innerText = `${WEAPON_NAMES[p1Weapon] || 'Arma'} · NIV ${1 + upgrades.damage + upgrades.reach + upgrades.rune}`;
+    document.getElementById('hud-p1-weapon').innerText = `${WEAPON_NAMES[p1Weapon] || 'Arma'} · NIV ${this.getFighterUpgradeLevel(this.p1, 1)}`;
+    document.getElementById('hud-p2-weapon').innerText = `${WEAPON_NAMES[p2Weapon] || 'Arma'} · NIV ${this.getFighterUpgradeLevel(this.p2, 2)}`;
 
     this.timer = 99; this.isRunning = true;
     this.lastTimerTick = performance.now();
     document.getElementById('game-timer').innerText = this.timer;
-    const stageLabel = this.gameMode === 'tower' ? `TORRE ${this.towerStage}/5 · ` : '';
-    document.getElementById('tower-stage-badge').innerText = `${stageLabel}COMBATE ÚNICO`;
+    document.getElementById('round-stage-badge').innerText = this.gameMode === 'infinite'
+      ? `RONDA ${this.infiniteRound} · MODO INFINITO`
+      : 'COMBATE VERSUS';
     audio.speak("FIGHT!");
+    audio.playBackgroundMusic();
     requestAnimationFrame(() => this.loop());
   }
 
@@ -959,8 +1078,12 @@ class Game3D {
     this.camera.lookAt(midX, 1.8, 0);
 
     // HUD Progress
-    document.getElementById('hud-p1-hp-fill').style.width = `${Math.max(0, (this.p1.hp / this.p1.hpMax) * 100)}%`;
-    document.getElementById('hud-p2-hp-fill').style.width = `${Math.max(0, (this.p2.hp / this.p2.hpMax) * 100)}%`;
+    const p1Health = Math.ceil(Math.max(0, this.p1.hp) / this.p1.hpMax * 100);
+    const p2Health = Math.ceil(Math.max(0, this.p2.hp) / this.p2.hpMax * 100);
+    document.getElementById('hud-p1-hp-fill').style.width = `${p1Health}%`;
+    document.getElementById('hud-p2-hp-fill').style.width = `${p2Health}%`;
+    document.getElementById('hud-p1-hp-text').innerText = `${p1Health}%`;
+    document.getElementById('hud-p2-hp-text').innerText = `${p2Health}%`;
     document.getElementById('hud-p1-super-fill').style.width = `${this.p1.superMeter}%`;
     document.getElementById('hud-p2-super-fill').style.width = `${this.p2.superMeter}%`;
     document.getElementById('hud-p1-super-text').innerText = `${Math.floor(this.p1.superMeter)}%`;
@@ -982,25 +1105,30 @@ class Game3D {
   endGame() {
     if (!this.isRunning) return;
     this.isRunning = false;
+    audio.stopBackgroundMusic();
     const p1Wins = this.timer === 0 ? this.p1.hp >= this.p2.hp : this.p1.hp > 0;
-    this.matchWinner = p1Wins ? 1 : 2;
-    if (p1Wins) {
-      this.coins += 100;
-      this.saveCoins();
+    const winnerPlayer = p1Wins ? 1 : (this.gameMode === 'versus' ? 2 : null);
+    this.matchWinner = winnerPlayer;
+    if (winnerPlayer) {
+      this.playerProgress[winnerPlayer].coins += 100;
+      this.saveCoins(winnerPlayer);
       this.updateCoinDisplays();
     }
 
-    audio.speak(p1Wins ? "FINISH HIM! JUGADOR 1 VICTORIOSO EN 3D" : "GAME OVER");
-    document.getElementById('victory-title').innerText = p1Wins ? "¡COMBATE GANADO!" : "¡COMBATE PERDIDO!";
-    document.getElementById('victory-subtitle').innerText = p1Wins
-      ? "+100 MONEDAS · PUEDES MEJORAR TU ARMA"
-      : `BOLSA: ${this.coins} MONEDAS`;
+    const victoryTitle = this.gameMode === 'versus'
+      ? (p1Wins ? '¡JUGADOR 1 GANA!' : '¡JUGADOR 2 GANA!')
+      : (p1Wins ? `¡RONDA ${this.infiniteRound} SUPERADA!` : `EL RIVAL GANA LA RONDA ${this.infiniteRound}`);
+    audio.speak(victoryTitle);
+    document.getElementById('victory-title').innerText = victoryTitle;
+    document.getElementById('victory-subtitle').innerText = winnerPlayer
+      ? `+100 MONEDAS PARA JUGADOR ${winnerPlayer}`
+      : 'REINTENTA PARA LLEGAR A LA SIGUIENTE RONDA';
     const upgradePanel = document.getElementById('weapon-upgrade-panel');
     upgradePanel.classList.add('hidden');
-    if (p1Wins) this.showWeaponUpgrades();
-    document.getElementById('btn-rematch').innerText = this.gameMode === 'tower' && p1Wins
-      ? "SIGUIENTE COMBATE"
-      : (p1Wins ? "REVANCHA" : "REINTENTAR COMBATE");
+    if (winnerPlayer) this.showWeaponUpgrades(winnerPlayer);
+    document.getElementById('btn-rematch').innerText = this.gameMode === 'infinite'
+      ? (p1Wins ? 'SIGUIENTE RONDA' : 'EMPEZAR DE NUEVO')
+      : 'REVANCHA';
     document.getElementById('modal-victory').classList.remove('hidden');
   }
 }

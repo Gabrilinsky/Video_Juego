@@ -52,8 +52,8 @@
 
       <!-- MODO DE JUEGO -->
       <div class="flex justify-center space-x-4 mb-3">
-        <button id="btn-mode-tower" class="px-6 py-2 bg-gradient-to-r from-amber-700 to-red-800 text-white font-mk text-xs md:text-sm rounded-xl border-2 border-amber-400 font-bold transition shadow-lg box-glow-gold">
-          <i class="fa-solid fa-tower-observation mr-2"></i> MODO TORRE (1P VS CPU)
+        <button id="btn-mode-infinite" class="px-6 py-2 bg-gradient-to-r from-amber-700 to-red-800 text-white font-mk text-xs md:text-sm rounded-xl border-2 border-amber-400 font-bold transition shadow-lg box-glow-gold">
+          <i class="fa-solid fa-infinity mr-2"></i> MODO INFINITO (1P VS CPU)
         </button>
         <button id="btn-mode-versus" class="px-6 py-2 bg-stone-900 text-stone-400 hover:text-white font-mk text-xs md:text-sm rounded-xl border border-stone-700 font-bold transition">
           <i class="fa-solid fa-users mr-2"></i> MODO VERSUS (2P LOCAL)
@@ -85,8 +85,13 @@
       </div>
 
       <div class="flex justify-center mb-3">
-        <div class="flex items-center gap-2 rounded-lg border border-amber-700/60 bg-amber-950/30 px-4 py-2 text-xs font-bold text-amber-300">
-          <i class="fa-solid fa-coins"></i><span>MONEDAS:</span><span data-coin-balance>0</span>
+          <div class="flex flex-wrap justify-center gap-3">
+          <div class="flex items-center gap-2 rounded-lg border border-red-800/60 bg-red-950/30 px-4 py-2 text-xs font-bold text-red-300">
+            <i class="fa-solid fa-coins"></i><span>J1:</span><span data-coin-balance="1">0</span>
+          </div>
+          <div data-player-two-wallet class="hidden flex items-center gap-2 rounded-lg border border-blue-800/60 bg-blue-950/30 px-4 py-2 text-xs font-bold text-blue-300">
+            <i class="fa-solid fa-coins"></i><span>J2:</span><span data-coin-balance="2">0</span>
+          </div>
         </div>
       </div>
 
@@ -318,7 +323,7 @@
         <!-- RELOJ Y STAGE -->
         <div class="flex flex-col items-center justify-center px-4">
           <div id="game-timer" class="font-mk text-3xl font-black text-amber-400 glow-gold">99</div>
-          <span id="tower-stage-badge" class="text-[10px] text-red-500 font-bold tracking-widest">3D ARENA</span>
+            <span id="round-stage-badge" class="text-[10px] text-red-500 font-bold tracking-widest">COMBATE INFINITO</span>
         </div>
 
         <!-- P2 HUD -->
@@ -337,6 +342,7 @@
             </div>
             <span id="hud-p2-super-text" class="text-[10px] text-amber-300 font-bold">0%</span>
           </div>
+          <div id="hud-p2-weapon" class="text-[10px] text-stone-400 uppercase tracking-wide text-right">Sai doble · NIV 1</div>
         </div>
       </div>
 
@@ -357,6 +363,47 @@
           <div class="font-mk text-3xl font-extrabold text-amber-400 glow-gold" id="p2-combo-count">3 HIT COMBO!</div>
           <div class="text-xs text-cyan-400 font-bold uppercase tracking-wider" id="p2-combo-sub">¡PODER OCULTO 3D ACTIVADO!</div>
         </div>
+      </div>
+
+      <div id="touch-controls" class="w-full max-w-5xl mt-2 grid grid-cols-2 gap-2 md:hidden">
+        <section class="touch-player-controls border border-red-900/60 bg-stone-950/90 rounded-lg p-2">
+          <h3 class="text-[10px] font-bold text-red-300 mb-2">JUGADOR 1</h3>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-2 gap-1">
+              <button type="button" class="touch-control-button" data-touch-key="KeyA" aria-label="Jugador 1, mover izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+              <button type="button" class="touch-control-button" data-touch-key="KeyD" aria-label="Jugador 1, mover derecha"><i class="fa-solid fa-arrow-right"></i></button>
+              <button type="button" class="touch-control-button" data-touch-key="KeyW" aria-label="Jugador 1, saltar"><i class="fa-solid fa-arrow-up"></i></button>
+              <button type="button" class="touch-control-button" data-touch-key="KeyS" aria-label="Jugador 1, bloquear"><i class="fa-solid fa-shield"></i></button>
+            </div>
+            <div class="grid grid-cols-3 gap-1">
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyJ" aria-label="Jugador 1, golpe"><i class="fa-solid fa-hand-fist"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyK" aria-label="Jugador 1, patada"><i class="fa-solid fa-shoe-prints"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyL" aria-label="Jugador 1, arma"><i class="fa-solid fa-khanda"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyU" aria-label="Jugador 1, proyectil"><i class="fa-solid fa-bullseye"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyI" aria-label="Jugador 1, poder"><i class="fa-solid fa-bolt"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyO" aria-label="Jugador 1, super"><span>SUPER</span></button>
+            </div>
+          </div>
+        </section>
+        <section id="touch-controls-p2" class="touch-player-controls hidden md:hidden border border-blue-900/60 bg-stone-950/90 rounded-lg p-2">
+          <h3 class="text-[10px] font-bold text-blue-300 mb-2">JUGADOR 2</h3>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-2 gap-1">
+              <button type="button" class="touch-control-button" data-touch-key="ArrowLeft" aria-label="Jugador 2, mover izquierda"><i class="fa-solid fa-arrow-left"></i></button>
+              <button type="button" class="touch-control-button" data-touch-key="ArrowRight" aria-label="Jugador 2, mover derecha"><i class="fa-solid fa-arrow-right"></i></button>
+              <button type="button" class="touch-control-button" data-touch-key="ArrowUp" aria-label="Jugador 2, saltar"><i class="fa-solid fa-arrow-up"></i></button>
+              <button type="button" class="touch-control-button" data-touch-key="ArrowDown" aria-label="Jugador 2, bloquear"><i class="fa-solid fa-shield"></i></button>
+            </div>
+            <div class="grid grid-cols-3 gap-1">
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyF" aria-label="Jugador 2, golpe"><i class="fa-solid fa-hand-fist"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyG" aria-label="Jugador 2, patada"><i class="fa-solid fa-shoe-prints"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyH" aria-label="Jugador 2, arma"><i class="fa-solid fa-khanda"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyV" aria-label="Jugador 2, proyectil"><i class="fa-solid fa-bullseye"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyB" aria-label="Jugador 2, poder"><i class="fa-solid fa-bolt"></i></button>
+              <button type="button" class="touch-control-button touch-attack" data-touch-key="KeyN" aria-label="Jugador 2, super"><span>SUPER</span></button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -419,12 +466,12 @@
 
       <section id="weapon-upgrade-panel" class="hidden mb-5 text-left">
         <div class="flex items-center justify-between mb-2">
-          <h3 class="font-mk text-sm text-amber-300">TIENDA DE ARMAS</h3>
-          <span class="text-[10px] text-amber-300"><i class="fa-solid fa-coins mr-1"></i><span data-coin-balance>0</span> MONEDAS</span>
+          <h3 id="weapon-upgrade-player" class="font-mk text-sm text-amber-300">TIENDA DE ARMAS</h3>
+          <span class="text-[10px] text-amber-300"><i class="fa-solid fa-coins mr-1"></i><span data-coin-balance="active">0</span> MONEDAS</span>
         </div>
         <p id="weapon-upgrade-status" class="text-[10px] text-stone-400 mb-2">Elige una mejora para tu arma.</p>
         <div class="text-[10px] text-stone-400 mb-2"><span id="weapon-upgrade-name">Katana</span> · <span id="weapon-upgrade-rank">NIVEL 1</span></div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
           <button data-upgrade="damage" class="weapon-upgrade-option border border-red-800/70 bg-red-950/40 hover:bg-red-900/70 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg p-2 text-left transition">
             <span class="block text-xs font-bold text-red-200"><i class="fa-solid fa-bolt mr-1"></i>Filo reforzado</span>
             <span class="block text-[10px] text-stone-400">Aumenta el daño del arma</span>
@@ -442,6 +489,18 @@
             <span class="block text-[10px] text-stone-400">Daño extra y brillo elemental</span>
             <span data-upgrade-level class="block mt-1 text-[10px] text-amber-300">Nivel 0 -> 1</span>
             <span data-upgrade-cost class="block text-[10px] text-amber-200">180 monedas</span>
+          </button>
+          <button data-upgrade="ranged" class="weapon-upgrade-option border border-sky-800/70 bg-sky-950/30 hover:bg-sky-900/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg p-2 text-left transition">
+            <span class="block text-xs font-bold text-sky-200"><i class="fa-solid fa-bullseye mr-1"></i>Proyectil</span>
+            <span class="block text-[10px] text-stone-400">Potencia el arma a distancia</span>
+            <span data-upgrade-level class="block mt-1 text-[10px] text-amber-300">Nivel 0 -> 1</span>
+            <span data-upgrade-cost class="block text-[10px] text-amber-200">100 monedas</span>
+          </button>
+          <button data-upgrade="power" class="weapon-upgrade-option border border-emerald-800/70 bg-emerald-950/30 hover:bg-emerald-900/60 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg p-2 text-left transition">
+            <span class="block text-xs font-bold text-emerald-200"><i class="fa-solid fa-wand-sparkles mr-1"></i>Poder</span>
+            <span class="block text-[10px] text-stone-400">Mejora daño y coste elemental</span>
+            <span data-upgrade-level class="block mt-1 text-[10px] text-amber-300">Nivel 0 -> 1</span>
+            <span data-upgrade-cost class="block text-[10px] text-amber-200">120 monedas</span>
           </button>
         </div>
       </section>
