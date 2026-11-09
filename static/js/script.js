@@ -1217,7 +1217,10 @@ class Game3D {
     const delay = Math.min(1000 * (2 ** this.onlineReconnectAttempt), 30_000);
     this.onlineReconnectAttempt += 1;
     const seconds = Math.ceil(delay / 1000);
-    this.showOnlineStatus(message || `Se perdió la conexión. Reintentando en ${seconds} s...`);
+    const failedAttempts = this.onlineReconnectAttempt;
+    this.showOnlineStatus(message || (failedAttempts >= 3
+      ? `No se pudo conectar con el servidor de partidas (intento ${failedAttempts}). Revisa que el servidor esté activo y que permita WebSocket. Reintentando en ${seconds} s...`
+      : `Se perdió la conexión. Reintentando en ${seconds} s...`));
     this.onlineReconnectTimer = window.setTimeout(() => {
       this.onlineReconnectTimer = null;
       this.connectOnline();

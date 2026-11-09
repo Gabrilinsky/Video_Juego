@@ -166,3 +166,21 @@ test('keeps idle multiplayer connections alive with heartbeats', async t => {
   assert.equal(socket.readyState, WebSocket.OPEN);
   assert.ok(pingCount > 0, 'server should ping idle clients');
 });
+
+test('accepts websocket origins forwarded by a reverse proxy', async t => {
+  const { httpServer, webSocketServer } = createGameServer();
+  await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve));
+  const port = httpServer.address().port;
+  t.after(async () => {
+    await new Promise(resolve => webSocketServer.close(resolve));
+    await new Promise(resolve => httpServer.close(resolve));
+  });
+  const open = headers => new Promise(resolve => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/multiplayer`, { headers });
+    socket.once('open', () => { socket.close(); resolve(true); });
+    socket.once('unexpected-response', () => resolve(false));
+    socket.once('error', () => resolve(false));
+  });
+  assert.equal(await open({ Origin: 'https://juego.example.com', 'X-Forwarded-Host': 'juego.example.com' }), true);
+  assert.equal(await open({ Origin: 'https://evil.example.net', 'X-Forwarded-Host': 'juego.example.com' }), false);
+});

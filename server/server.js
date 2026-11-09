@@ -53,6 +53,18 @@ function sanitizeQueuePayload(payload) {
   };
 }
 
+function isOriginAllowed(originHost, request) {
+  // Detrás de un proxy (Render, Railway, túneles...) la cabecera Host puede
+  // ser distinta del dominio público, así que también se acepta el host
+  // reenviado por el proxy y los orígenes permitidos por variable de entorno.
+  const forwardedHost = String(request.headers['x-forwarded-host'] || '').split(',')[0].trim();
+  const extraHosts = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(value => value.trim().replace(/^https?:\/\//, ''))
+    .filter(Boolean);
+  return [request.headers.host, forwardedHost, ...extraHosts].includes(originHost);
+}
+
 function createGameServer({ heartbeatIntervalMs = 25_000 } = {}) {
   const waitingPlayers = [];
   const httpServer = http.createServer((request, response) => {
@@ -173,7 +185,7 @@ function createGameServer({ heartbeatIntervalMs = 25_000 } = {}) {
       return;
     }
     if (requestUrl.pathname !== '/multiplayer'
-      || (originHost && originHost !== request.headers.host)) {
+      || (originHost && !isOriginAllowed(originHost, request))) {
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
       socket.destroy();
       return;
