@@ -95,3 +95,23 @@ test('pairs two players, relays controls, and broadcasts the result', async t =>
   assert.equal((await resultOne).winner, 1);
   assert.equal((await resultTwo).winner, 1);
 });
+
+test('keeps idle multiplayer connections alive with heartbeats', async t => {
+  const { httpServer, webSocketServer } = createGameServer({ heartbeatIntervalMs: 20 });
+  await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve));
+  const url = `ws://127.0.0.1:${httpServer.address().port}/multiplayer`;
+  const socket = await connect(url);
+  let pingCount = 0;
+  socket.on('ping', () => {
+    pingCount += 1;
+  });
+  t.after(async () => {
+    socket.terminate();
+    await new Promise(resolve => webSocketServer.close(resolve));
+    await new Promise(resolve => httpServer.close(resolve));
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 75));
+  assert.equal(socket.readyState, WebSocket.OPEN);
+  assert.ok(pingCount > 0, 'server should ping idle clients');
+});

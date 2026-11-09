@@ -48,7 +48,7 @@ function sanitizeQueuePayload(payload) {
   };
 }
 
-function createGameServer() {
+function createGameServer({ heartbeatIntervalMs = 25_000 } = {}) {
   const waitingPlayers = [];
   const httpServer = http.createServer((request, response) => {
     const url = new URL(request.url, 'http://localhost');
@@ -89,6 +89,18 @@ function createGameServer() {
     });
   });
   const webSocketServer = new WebSocketServer({ noServer: true, maxPayload: 4096 });
+  const heartbeatInterval = setInterval(() => {
+    webSocketServer.clients.forEach(client => {
+      if (!client.isAlive) {
+        client.terminate();
+        return;
+      }
+      client.isAlive = false;
+      client.ping();
+    });
+  }, heartbeatIntervalMs);
+  heartbeatInterval.unref();
+  webSocketServer.on('close', () => clearInterval(heartbeatInterval));
 
   const send = (client, message) => {
     if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(message));
@@ -155,6 +167,10 @@ function createGameServer() {
   webSocketServer.on('connection', client => {
     client.room = null;
     client.queuePayload = null;
+    client.isAlive = true;
+    client.on('pong', () => {
+      client.isAlive = true;
+    });
     client.messageWindowStart = Date.now();
     client.messageCount = 0;
     client.on('message', rawMessage => {
