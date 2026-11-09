@@ -697,6 +697,9 @@ class Game3D {
     this.timer = 99; this.gameMode = 'infinite'; this.infiniteRound = 1; this.isRunning = false;
     this.matchWinner = null;
     this.projectiles = []; this.particles3D = []; this.keys = {};
+    this.remoteKeys = {};
+    this.onlinePlayer = null;
+    this.onlineSocket = null;
     this.shopPlayerId = 1;
     this.playerProgress = {
       1: { coins: this.loadCoins(1), upgrades: this.loadWeaponUpgrades(1) },
@@ -930,19 +933,27 @@ class Game3D {
   }
 
   bindEvents() {
-    window.addEventListener('keydown', e => { this.keys[e.code] = true; });
-    window.addEventListener('keyup', e => { this.keys[e.code] = false; });
+    window.addEventListener('keydown', e => {
+      this.keys[e.code] = true;
+      this.broadcastOnlineInput();
+    });
+    window.addEventListener('keyup', e => {
+      this.keys[e.code] = false;
+      this.broadcastOnlineInput();
+    });
     document.querySelectorAll('[data-touch-key]').forEach(button => {
       const key = button.dataset.touchKey;
       const release = event => {
         event.preventDefault();
         this.keys[key] = false;
+        this.broadcastOnlineInput();
         button.classList.remove('is-pressed');
       };
       button.addEventListener('pointerdown', event => {
         if (!this.isRunning) return;
         event.preventDefault();
         this.keys[key] = true;
+        this.broadcastOnlineInput();
         button.classList.add('is-pressed');
         button.setPointerCapture(event.pointerId);
       });
@@ -969,6 +980,9 @@ class Game3D {
       document.getElementById('touch-controls-p2').classList.remove('hidden');
     });
 
+    document.getElementById('btn-mode-online').addEventListener('click', () => this.findOnlineMatch());
+    document.getElementById('btn-cancel-online').addEventListener('click', () => this.cancelOnlineMatch());
+
     document.getElementById('btn-start-fight').addEventListener('click', () => {
       this.infiniteRound = 1;
       this.resetWeaponUpgrades(1);
@@ -992,6 +1006,7 @@ class Game3D {
 
     document.getElementById('btn-re-select').addEventListener('click', () => {
       document.getElementById('modal-victory').classList.add('hidden');
+      this.disconnectOnline();
       document.getElementById('game-screen').classList.add('hidden');
       document.getElementById('selection-screen').classList.remove('hidden');
     });
@@ -1023,9 +1038,152 @@ class Game3D {
     });
   }
 
-  startMatch() {
+  getFighterConfig(playerId) {
+    const prefix = `p${playerId}`;
+    const weapon1 = document.getElementById(`${prefix}-weapon1`).value;
+    const weapon2 = document.getElementById(`${prefix}-weapon2`).value;
+    const element = document.getElementById(`${prefix}-element`).value;
+    return {
+      outfit: document.getElementById(`${prefix}-outfit`).value,
+      element,
+      weapon1,
+      weapon2,
+      weaponUpgrades: this.getUpgradeSet(weapon1, playerId, 'melee'),
+      rangedUpgrades: this.getUpgradeSet(weapon2, playerId, 'ranged'),
+      powerUpgrades: this.getUpgradeSet(element, playerId, 'power'),
+      style: document.getElementById(`${prefix}-style`).value,
+      colorSkin: document.getElementById(`${prefix}-color-skin`).value,
+      colorSuit: document.getElementById(`${prefix}-color-suit`).value,
+      colorAura: document.getElementById(`${prefix}-color-aura`).value
+    };
+  }
+
+  showOnlineStatus(message, visible = true) {
+    const panel = document.getElementById('online-match-status');
+    document.getElementById('online-match-message').innerText = message;
+    panel.classList.toggle('hidden', !visible);
+  }
+
+  findOnlineMatch() {
+    if (!window.WebSocket || !['http:', 'https:'].includes(window.location.protocol)) {
+      this.showOnlineStatus('Para jugar en línea, abre el juego desde el servidor con npm start (no como archivo local).');
+      return;
+    }
+    if (this.onlineSocket) this.disconnectOnline();
+    this.gameMode = 'online';
+    this.onlinePlayer = null;
+    this.remoteKeys = {};
+    this.setOnlineControlsDisabled(true);
+    this.showOnlineStatus('Conectando al servidor de partidas...');
+    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(`${scheme}//${window.location.host}/multiplayer`);
+    this.onlineSocket = socket;
+
+    socket.addEventListener('open', () => {
+      if (this.onlineSocket !== socket) return;
+      socket.send(JSON.stringify({
+        type: 'queue',
+        fighter: this.getFighterConfig(1),
+        arena: document.getElementById('select-arena').value
+      }));
+      this.showOnlineStatus('Buscando un rival en línea... La partida comenzará al encontrar a otra persona.');
+    });
+    socket.addEventListener('message', event => {
+      if (this.onlineSocket !== socket) return;
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch (error) {
+        this.showOnlineStatus('El servidor envió una respuesta no válida. Inténtalo de nuevo.');
+        return;
+      }
+      if (message.type === 'waiting') {
+        this.showOnlineStatus('Buscando un rival en línea... La partida comenzará al encontrar a otra persona.');
+      } else if (message.type === 'match') {
+        this.onlinePlayer = message.playerNumber;
+        this.remoteKeys = {};
+        this.showOnlineStatus('', false);
+        document.getElementById('p2-header-badge').innerText = `RIVAL EN LÍNEA · TÚ JUGADOR ${this.onlinePlayer}`;
+        document.getElementById('touch-controls-p2').classList.add('hidden');
+        this.matchWinner = null;
+        this.startMatch(message);
+      } else if (message.type === 'input') {
+        this.remoteKeys = message.keys;
+      } else if (message.type === 'finished') {
+        if (this.isRunning) this.endGame(message.winner);
+      } else if (message.type === 'opponent-left') {
+        this.isRunning = false;
+        audio.stopBackgroundMusic();
+        document.getElementById('game-screen').classList.add('hidden');
+        document.getElementById('selection-screen').classList.remove('hidden');
+        this.showOnlineStatus('Tu rival se desconectó. Puedes buscar otra partida.');
+        this.disconnectOnline();
+      } else if (message.type === 'error') {
+        this.showOnlineStatus(message.message || 'No se pudo encontrar una partida.');
+        this.disconnectOnline();
+      }
+    });
+    socket.addEventListener('error', () => {
+      if (this.onlineSocket !== socket) return;
+      this.showOnlineStatus('No se pudo conectar al servidor. Comprueba que esté iniciado e inténtalo otra vez.');
+    });
+    socket.addEventListener('close', () => {
+      if (this.onlineSocket !== socket) return;
+      this.onlineSocket = null;
+      if (this.isRunning && this.gameMode === 'online') {
+        this.isRunning = false;
+        audio.stopBackgroundMusic();
+        document.getElementById('game-screen').classList.add('hidden');
+        document.getElementById('selection-screen').classList.remove('hidden');
+        this.disconnectOnline();
+        this.showOnlineStatus('Se perdió la conexión con el servidor. Puedes buscar otra partida.');
+      } else if (!this.isRunning) {
+        this.disconnectOnline();
+        this.showOnlineStatus('Se perdió la conexión con el servidor. Inténtalo de nuevo.');
+      }
+    });
+  }
+
+  setOnlineControlsDisabled(disabled) {
+    ['btn-mode-infinite', 'btn-mode-versus', 'btn-mode-online', 'btn-start-fight'].forEach(id => {
+      document.getElementById(id).disabled = disabled;
+    });
+  }
+
+  broadcastOnlineInput() {
+    if (!this.onlineSocket || this.onlineSocket.readyState !== WebSocket.OPEN || this.gameMode !== 'online') return;
+    const codes = ['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyK', 'KeyL', 'KeyU', 'KeyI', 'KeyO'];
+    const keys = {};
+    codes.forEach(code => { keys[code] = !!this.keys[code]; });
+    this.onlineSocket.send(JSON.stringify({ type: 'input', keys }));
+  }
+
+  cancelOnlineMatch() {
+    this.disconnectOnline();
+    this.gameMode = 'infinite';
+    this.showOnlineStatus('', false);
+  }
+
+  disconnectOnline() {
+    const socket = this.onlineSocket;
+    this.onlineSocket = null;
+    this.onlinePlayer = null;
+    this.remoteKeys = {};
+    this.setOnlineControlsDisabled(false);
+    this.gameMode = 'infinite';
+    document.getElementById('p2-header-badge').innerText = 'RIVAL INFINITO (CPU AI)';
+    document.getElementById('touch-controls-p2').classList.add('hidden');
+    document.querySelector('[data-player-two-wallet]').classList.add('hidden');
+    if (socket && socket.readyState < WebSocket.CLOSING) {
+      socket.close(1000, 'Leaving match');
+    }
+  }
+
+  startMatch(onlineMatch = null) {
     document.getElementById('selection-screen').classList.add('hidden');
     document.getElementById('game-screen').classList.remove('hidden');
+    document.getElementById('btn-rematch').classList.remove('hidden');
+    document.getElementById('btn-re-select').innerText = 'VOLVER AL MENÚ';
     this.resizeRenderer();
     this.applyArena();
     this.projectiles.forEach(projectile => this.scene.remove(projectile.mesh));
@@ -1035,16 +1193,13 @@ class Game3D {
     if (this.p1) this.scene.remove(this.p1.group);
     if (this.p2) this.scene.remove(this.p2.group);
 
-    const p1Weapon = document.getElementById('p1-weapon1').value;
-    const p1RangedWeapon = document.getElementById('p1-weapon2').value;
-    const p1Element = document.getElementById('p1-element').value;
-    const p1Cfg = { outfit: document.getElementById('p1-outfit').value, element: p1Element, weapon1: p1Weapon, weapon2: p1RangedWeapon, weaponUpgrades: this.getUpgradeSet(p1Weapon, 1, 'melee'), rangedUpgrades: this.getUpgradeSet(p1RangedWeapon, 1, 'ranged'), powerUpgrades: this.getUpgradeSet(p1Element, 1, 'power'), style: document.getElementById('p1-style').value, colorSkin: document.getElementById('p1-color-skin').value, colorSuit: document.getElementById('p1-color-suit').value, colorAura: document.getElementById('p1-color-aura').value };
+    if (onlineMatch) document.getElementById('select-arena').value = onlineMatch.arena;
+    const p1Cfg = onlineMatch ? onlineMatch.fighters[0] : this.getFighterConfig(1);
+    const p1Weapon = p1Cfg.weapon1;
     this.p1 = new HumanoidFighter3D(1, p1Cfg, false, this.scene);
 
-    const p2Weapon = document.getElementById('p2-weapon1').value;
-    const p2RangedWeapon = document.getElementById('p2-weapon2').value;
-    const p2Element = document.getElementById('p2-element').value;
-    const p2Cfg = { outfit: document.getElementById('p2-outfit').value, element: p2Element, weapon1: p2Weapon, weapon2: p2RangedWeapon, weaponUpgrades: this.getUpgradeSet(p2Weapon, 2, 'melee'), rangedUpgrades: this.getUpgradeSet(p2RangedWeapon, 2, 'ranged'), powerUpgrades: this.getUpgradeSet(p2Element, 2, 'power'), style: document.getElementById('p2-style').value, colorSkin: document.getElementById('p2-color-skin').value, colorSuit: document.getElementById('p2-color-suit').value, colorAura: document.getElementById('p2-color-aura').value };
+    const p2Cfg = onlineMatch ? onlineMatch.fighters[1] : this.getFighterConfig(2);
+    const p2Weapon = p2Cfg.weapon1;
     if (this.gameMode === 'infinite') {
       const scaling = Math.min(this.infiniteRound - 1, 40);
       p2Cfg.hpMax = 100 + scaling * 2;
@@ -1053,7 +1208,12 @@ class Game3D {
       document.getElementById('hud-p2-name').innerText = `RIVAL RONDA ${this.infiniteRound}`;
     } else {
       this.p2 = new HumanoidFighter3D(2, p2Cfg, true, this.scene);
-      document.getElementById('hud-p2-name').innerText = "JUGADOR 2";
+      document.getElementById('hud-p1-name').innerText = this.gameMode === 'online'
+        ? (this.onlinePlayer === 1 ? 'TÚ' : 'RIVAL')
+        : 'JUGADOR 1';
+      document.getElementById('hud-p2-name').innerText = this.gameMode === 'online'
+        ? (this.onlinePlayer === 2 ? 'TÚ' : 'RIVAL')
+        : 'JUGADOR 2';
     }
 
     document.getElementById('hud-p1-weapon').innerText = `${WEAPON_NAMES[p1Weapon] || 'Arma'} · NIV ${this.getFighterUpgradeLevel(this.p1, 1)}`;
@@ -1064,7 +1224,7 @@ class Game3D {
     document.getElementById('game-timer').innerText = this.timer;
     document.getElementById('round-stage-badge').innerText = this.gameMode === 'infinite'
       ? `RONDA ${this.infiniteRound} · MODO INFINITO`
-      : 'COMBATE VERSUS';
+      : this.gameMode === 'online' ? 'COMBATE EN LÍNEA' : 'COMBATE VERSUS';
     audio.speak("FIGHT!");
     audio.playBackgroundMusic();
     requestAnimationFrame(() => this.loop());
@@ -1080,35 +1240,50 @@ class Game3D {
       this.lastTimerTick += elapsedSeconds * 1000;
       document.getElementById('game-timer').innerText = this.timer;
       if (this.timer === 0) {
-        this.endGame();
-        return;
+        if (this.gameMode !== 'online' || this.onlinePlayer === 1) this.endGame();
+        if (!this.isRunning) return;
       }
     }
 
     // P1 Controls
-    if (this.keys['KeyA']) { this.p1.vx = -this.p1.moveSpeed; this.p1.state = 'walk'; }
-    else if (this.keys['KeyD']) { this.p1.vx = this.p1.moveSpeed; this.p1.state = 'walk'; }
-    if (this.keys['KeyW'] && this.p1.isGrounded) { this.p1.vy = this.p1.jumpPower; this.p1.isGrounded = false; }
-    this.p1.isBlocking = !!this.keys['KeyS'];
-    if (this.keys['KeyJ']) this.p1.attackLight(this.p2, this.particles3D);
-    if (this.keys['KeyK']) this.p1.attackHeavy(this.p2);
-    if (this.keys['KeyL']) this.p1.attackWeapon1(this.p2, this.particles3D);
-    if (this.keys['KeyU']) this.p1.attackWeapon2(this.projectiles, this.scene);
-    if (this.keys['KeyI']) this.p1.attackElemental(this.projectiles, this.scene);
-    if (this.keys['KeyO']) this.p1.attackUltimate(this.p2, this.particles3D, this.camera);
+    const p1Controls = this.gameMode === 'online' && this.onlinePlayer !== 1 ? this.remoteKeys : this.keys;
+    if (p1Controls['KeyA']) { this.p1.vx = -this.p1.moveSpeed; this.p1.state = 'walk'; }
+    else if (p1Controls['KeyD']) { this.p1.vx = this.p1.moveSpeed; this.p1.state = 'walk'; }
+    if (p1Controls['KeyW'] && this.p1.isGrounded) { this.p1.vy = this.p1.jumpPower; this.p1.isGrounded = false; }
+    this.p1.isBlocking = !!p1Controls['KeyS'];
+    if (p1Controls['KeyJ']) this.p1.attackLight(this.p2, this.particles3D);
+    if (p1Controls['KeyK']) this.p1.attackHeavy(this.p2);
+    if (p1Controls['KeyL']) this.p1.attackWeapon1(this.p2, this.particles3D);
+    if (p1Controls['KeyU']) this.p1.attackWeapon2(this.projectiles, this.scene);
+    if (p1Controls['KeyI']) this.p1.attackElemental(this.projectiles, this.scene);
+    if (p1Controls['KeyO']) this.p1.attackUltimate(this.p2, this.particles3D, this.camera);
 
     // P2 Controls (Versus vs CPU)
-    if (this.gameMode === 'versus') {
-      if (this.keys['ArrowLeft']) { this.p2.vx = -this.p2.moveSpeed; this.p2.state = 'walk'; }
-      else if (this.keys['ArrowRight']) { this.p2.vx = this.p2.moveSpeed; this.p2.state = 'walk'; }
-      if (this.keys['ArrowUp'] && this.p2.isGrounded) { this.p2.vy = this.p2.jumpPower; this.p2.isGrounded = false; }
-      this.p2.isBlocking = !!this.keys['ArrowDown'];
-      if (this.keys['Numpad1'] || this.keys['KeyF']) this.p2.attackLight(this.p1, this.particles3D);
-      if (this.keys['Numpad2'] || this.keys['KeyG']) this.p2.attackHeavy(this.p1);
-      if (this.keys['Numpad3'] || this.keys['KeyH']) this.p2.attackWeapon1(this.p1, this.particles3D);
-      if (this.keys['Numpad7'] || this.keys['KeyV']) this.p2.attackWeapon2(this.projectiles, this.scene);
-      if (this.keys['KeyB']) this.p2.attackElemental(this.projectiles, this.scene);
-      if (this.keys['Numpad9'] || this.keys['KeyN']) this.p2.attackUltimate(this.p1, this.particles3D, this.camera);
+    if (this.gameMode === 'versus' || this.gameMode === 'online') {
+      const p2Controls = this.gameMode === 'online' && this.onlinePlayer !== 2 ? this.remoteKeys : this.keys;
+      const moveLeft = this.gameMode === 'online' ? p2Controls['KeyA'] : p2Controls['ArrowLeft'];
+      const moveRight = this.gameMode === 'online' ? p2Controls['KeyD'] : p2Controls['ArrowRight'];
+      const jump = this.gameMode === 'online' ? p2Controls['KeyW'] : p2Controls['ArrowUp'];
+      const block = this.gameMode === 'online' ? p2Controls['KeyS'] : p2Controls['ArrowDown'];
+      if (moveLeft) { this.p2.vx = -this.p2.moveSpeed; this.p2.state = 'walk'; }
+      else if (moveRight) { this.p2.vx = this.p2.moveSpeed; this.p2.state = 'walk'; }
+      if (jump && this.p2.isGrounded) { this.p2.vy = this.p2.jumpPower; this.p2.isGrounded = false; }
+      this.p2.isBlocking = !!block;
+      if (this.gameMode === 'online') {
+        if (p2Controls['KeyJ']) this.p2.attackLight(this.p1, this.particles3D);
+        if (p2Controls['KeyK']) this.p2.attackHeavy(this.p1);
+        if (p2Controls['KeyL']) this.p2.attackWeapon1(this.p1, this.particles3D);
+        if (p2Controls['KeyU']) this.p2.attackWeapon2(this.projectiles, this.scene);
+        if (p2Controls['KeyI']) this.p2.attackElemental(this.projectiles, this.scene);
+        if (p2Controls['KeyO']) this.p2.attackUltimate(this.p1, this.particles3D, this.camera);
+      } else {
+        if (p2Controls['Numpad1'] || p2Controls['KeyF']) this.p2.attackLight(this.p1, this.particles3D);
+        if (p2Controls['Numpad2'] || p2Controls['KeyG']) this.p2.attackHeavy(this.p1);
+        if (p2Controls['Numpad3'] || p2Controls['KeyH']) this.p2.attackWeapon1(this.p1, this.particles3D);
+        if (p2Controls['Numpad7'] || p2Controls['KeyV']) this.p2.attackWeapon2(this.projectiles, this.scene);
+        if (p2Controls['KeyB']) this.p2.attackElemental(this.p1, this.projectiles, this.scene);
+        if (p2Controls['Numpad9'] || p2Controls['KeyN']) this.p2.attackUltimate(this.p1, this.particles3D, this.camera);
+      }
     } else {
       this.p2.updateCPU(this.p1, this.projectiles, this.particles3D, this.scene, document.getElementById('select-difficulty').value);
     }
@@ -1150,7 +1325,7 @@ class Game3D {
     document.getElementById('hud-p1-super-text').innerText = `${Math.floor(this.p1.superMeter)}%`;
     document.getElementById('hud-p2-super-text').innerText = `${Math.floor(this.p2.superMeter)}%`;
 
-    if (this.p1.hp <= 0 || this.p2.hp <= 0) this.endGame();
+    if ((this.p1.hp <= 0 || this.p2.hp <= 0) && (this.gameMode !== 'online' || this.onlinePlayer === 1)) this.endGame();
   }
 
   render() {
@@ -1163,33 +1338,45 @@ class Game3D {
     requestAnimationFrame(() => this.loop());
   }
 
-  endGame() {
+  endGame(winnerOverride = undefined) {
     if (!this.isRunning) return;
+    if (this.gameMode === 'online' && this.onlinePlayer === 2 && winnerOverride === undefined) return;
     this.isRunning = false;
     audio.stopBackgroundMusic();
-    const p1Wins = this.timer === 0 ? this.p1.hp >= this.p2.hp : this.p1.hp > 0;
-    const winnerPlayer = p1Wins ? 1 : (this.gameMode === 'versus' ? 2 : null);
+    const hasWinnerOverride = winnerOverride !== undefined;
+    const p1Wins = hasWinnerOverride
+      ? winnerOverride === 1
+      : (this.timer === 0 ? this.p1.hp >= this.p2.hp : this.p1.hp > 0);
+    const winnerPlayer = hasWinnerOverride ? winnerOverride : (p1Wins ? 1 : (this.gameMode === 'versus' ? 2 : null));
     this.matchWinner = winnerPlayer;
-    if (winnerPlayer) {
+    if (winnerPlayer && this.gameMode !== 'online') {
       this.playerProgress[winnerPlayer].coins += 100;
       this.saveCoins(winnerPlayer);
       this.updateCoinDisplays();
     }
 
-    const victoryTitle = this.gameMode === 'versus'
-      ? (p1Wins ? '¡JUGADOR 1 GANA!' : '¡JUGADOR 2 GANA!')
-      : (p1Wins ? `¡RONDA ${this.infiniteRound} SUPERADA!` : `EL RIVAL GANA LA RONDA ${this.infiniteRound}`);
+    if (this.gameMode === 'online' && this.onlinePlayer === 1 && this.onlineSocket && this.onlineSocket.readyState === WebSocket.OPEN) {
+      this.onlineSocket.send(JSON.stringify({ type: 'finished', winner: winnerPlayer }));
+    }
+
+    const victoryTitle = this.gameMode === 'online'
+      ? (winnerPlayer === null ? '¡EMPATE!' : winnerPlayer === this.onlinePlayer ? '¡GANASTE!' : '¡PERDISTE!')
+      : this.gameMode === 'versus'
+        ? (p1Wins ? '¡JUGADOR 1 GANA!' : '¡JUGADOR 2 GANA!')
+        : (p1Wins ? `¡RONDA ${this.infiniteRound} SUPERADA!` : `EL RIVAL GANA LA RONDA ${this.infiniteRound}`);
     audio.speak(victoryTitle);
     document.getElementById('victory-title').innerText = victoryTitle;
-    document.getElementById('victory-subtitle').innerText = winnerPlayer
-      ? `+100 MONEDAS PARA JUGADOR ${winnerPlayer}`
-      : 'REINTENTA PARA LLEGAR A LA SIGUIENTE RONDA';
+    document.getElementById('victory-subtitle').innerText = this.gameMode === 'online'
+      ? 'La partida en línea terminó.'
+      : winnerPlayer ? `+100 MONEDAS PARA JUGADOR ${winnerPlayer}` : 'REINTENTA PARA LLEGAR A LA SIGUIENTE RONDA';
     const upgradePanel = document.getElementById('weapon-upgrade-panel');
     upgradePanel.classList.add('hidden');
-    if (winnerPlayer) this.showWeaponUpgrades(winnerPlayer);
+    if (winnerPlayer && this.gameMode !== 'online') this.showWeaponUpgrades(winnerPlayer);
+    document.getElementById('btn-rematch').classList.toggle('hidden', this.gameMode === 'online');
     document.getElementById('btn-rematch').innerText = this.gameMode === 'infinite'
       ? (p1Wins ? 'SIGUIENTE RONDA' : 'EMPEZAR DE NUEVO')
       : 'REVANCHA';
+    document.getElementById('btn-re-select').innerText = this.gameMode === 'online' ? 'SALIR DE LA PARTIDA' : 'VOLVER AL MENÚ';
     document.getElementById('modal-victory').classList.remove('hidden');
   }
 }

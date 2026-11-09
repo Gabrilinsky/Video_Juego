@@ -1,0 +1,13 @@
+{
+  "name": "shadow-kombat-3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Juego de lucha 3D con emparejamiento multijugador en línea",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
