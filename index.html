@@ -67,6 +67,20 @@
         </button>
       </div>
 
+      <div class="mb-3 rounded-xl border border-emerald-800/50 bg-stone-900/70 p-3">
+        <p class="mb-2 text-center text-xs font-bold text-emerald-200">SALA PRIVADA</p>
+        <div class="flex flex-col justify-center gap-2 sm:flex-row">
+          <button id="btn-create-room" type="button" class="rounded-lg border border-emerald-600 bg-emerald-950/70 px-4 py-2 text-xs font-bold text-emerald-100 hover:bg-emerald-900">
+            <i class="fa-solid fa-plus mr-1"></i> CREAR SALA Y OBTENER CÓDIGO
+          </button>
+          <label for="online-room-code" class="sr-only">Código de sala</label>
+          <input id="online-room-code" type="text" maxlength="6" autocomplete="off" spellcheck="false" placeholder="INGRESA EL CÓDIGO" class="w-full rounded-lg border border-stone-600 bg-stone-950 px-3 py-2 text-center font-mono text-sm font-bold uppercase tracking-[0.2em] text-white placeholder:text-stone-500 sm:w-52">
+          <button id="btn-join-room" type="button" class="rounded-lg border border-cyan-700 bg-cyan-950/70 px-4 py-2 text-xs font-bold text-cyan-100 hover:bg-cyan-900">
+            <i class="fa-solid fa-right-to-bracket mr-1"></i> UNIRSE
+          </button>
+        </div>
+      </div>
+
       <div id="online-match-status" class="hidden text-center mb-3 rounded-xl border border-emerald-700/60 bg-emerald-950/40 p-3" aria-live="polite">
         <p id="online-match-message" class="text-sm text-emerald-200">Buscando rival...</p>
         <button id="btn-cancel-online" type="button" class="mt-2 px-4 py-1.5 bg-stone-800 hover:bg-stone-700 rounded-lg text-xs font-bold">CANCELAR</button>

@@ -19,6 +19,8 @@ Despliega este proyecto en un proveedor que permita aplicaciones Node.js y conex
 
 El botón **MULTIJUGADOR EN LÍNEA** pone al jugador en una cola global y lo empareja con la siguiente persona disponible. El servidor no requiere cuentas ni almacena perfiles. Las partidas casuales intercambian controles en tiempo real; no hay cuentas, ranking ni protección contra trampas. Una conexión estable y un servidor geográficamente cercano mejoran la respuesta.
 
+Para jugar con alguien en una sala privada, crea una sala y comparte el código de seis caracteres, o ingresa el código de otra persona y selecciona **UNIRSE**. Las salas privadas solo emparejan a jugadores que ingresaron el mismo código.
+
 ## Pruebas
 
 ```sh

@@ -25,6 +25,10 @@ const MIME_TYPES = {
 
 function sanitizeQueuePayload(payload) {
   if (!payload || typeof payload !== 'object' || !ALLOWED.arena.includes(payload.arena)) return null;
+  const roomCode = payload.roomCode === undefined || payload.roomCode === null
+    ? null
+    : typeof payload.roomCode === 'string' ? payload.roomCode.trim().toUpperCase() : '';
+  if (roomCode !== null && !/^[A-Z0-9]{6}$/.test(roomCode)) return null;
   const fighter = payload.fighter;
   if (!fighter || typeof fighter !== 'object') return null;
   for (const key of ['outfit', 'element', 'weapon1', 'weapon2', 'style']) {
@@ -35,6 +39,7 @@ function sanitizeQueuePayload(payload) {
   }
   return {
     arena: payload.arena,
+    roomCode,
     fighter: {
       outfit: fighter.outfit,
       element: fighter.element,
@@ -120,25 +125,39 @@ function createGameServer({ heartbeatIntervalMs = 25_000 } = {}) {
     });
   };
   const matchWaitingPlayers = () => {
-    while (waitingPlayers.length >= 2) {
-      const playerOne = waitingPlayers.shift();
-      const playerTwo = waitingPlayers.shift();
-      if (playerOne.readyState !== WebSocket.OPEN || playerTwo.readyState !== WebSocket.OPEN) continue;
+    waitingPlayers.forEach((player, index) => {
+      if (player.readyState !== WebSocket.OPEN) waitingPlayers[index] = null;
+    });
+    for (let firstIndex = 0; firstIndex < waitingPlayers.length; firstIndex += 1) {
+      const playerOne = waitingPlayers[firstIndex];
+      if (!playerOne) continue;
+      const secondIndex = waitingPlayers.findIndex((player, index) =>
+        index > firstIndex && player && player.queuePayload.roomCode === playerOne.queuePayload.roomCode);
+      if (secondIndex === -1) continue;
+      const playerTwo = waitingPlayers[secondIndex];
+      waitingPlayers[firstIndex] = null;
+      waitingPlayers[secondIndex] = null;
       const room = {
         players: [playerOne, playerTwo],
         fighters: [playerOne.queuePayload.fighter, playerTwo.queuePayload.fighter],
         arena: playerOne.queuePayload.arena,
+        roomCode: playerOne.queuePayload.roomCode,
         finished: false
       };
       room.players.forEach((client, index) => {
         client.room = room;
+        client.queuePayload = null;
         send(client, {
           type: 'match',
           playerNumber: index + 1,
           fighters: room.fighters,
-          arena: room.arena
+          arena: room.arena,
+          roomCode: room.roomCode
         });
       });
+    }
+    for (let index = waitingPlayers.length - 1; index >= 0; index -= 1) {
+      if (!waitingPlayers[index]) waitingPlayers.splice(index, 1);
     }
   };
 

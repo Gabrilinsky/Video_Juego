@@ -700,6 +700,10 @@ class Game3D {
     this.remoteKeys = {};
     this.onlinePlayer = null;
     this.onlineSocket = null;
+    this.onlineReconnectTimer = null;
+    this.onlineReconnectAttempt = 0;
+    this.onlineMatchRequested = false;
+    this.onlineRoomCode = null;
     this.lastSentOnlineInput = null;
     this.shopPlayerId = 1;
     this.playerProgress = {
@@ -982,6 +986,11 @@ class Game3D {
     });
 
     document.getElementById('btn-mode-online').addEventListener('click', () => this.findOnlineMatch());
+    document.getElementById('btn-create-room').addEventListener('click', () => this.createOnlineRoom());
+    document.getElementById('btn-join-room').addEventListener('click', () => this.joinOnlineRoom());
+    document.getElementById('online-room-code').addEventListener('keydown', event => {
+      if (event.key === 'Enter') this.joinOnlineRoom();
+    });
     document.getElementById('btn-cancel-online').addEventListener('click', () => this.cancelOnlineMatch());
 
     document.getElementById('btn-start-fight').addEventListener('click', () => {
@@ -1066,28 +1075,75 @@ class Game3D {
   }
 
   findOnlineMatch() {
+    this.startOnlineSearch(null);
+  }
+
+  createOnlineRoom() {
+    const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const randomValues = new Uint32Array(6);
+    window.crypto.getRandomValues(randomValues);
+    const roomCode = Array.from(randomValues, value => characters[value % characters.length]).join('');
+    document.getElementById('online-room-code').value = roomCode;
+    this.startOnlineSearch(roomCode);
+  }
+
+  joinOnlineRoom() {
+    const roomCode = document.getElementById('online-room-code').value.trim().toUpperCase();
+    if (!/^[A-Z0-9]{6}$/.test(roomCode)) {
+      this.showOnlineStatus('Ingresa un código de sala válido de 6 letras o números.');
+      return;
+    }
+    document.getElementById('online-room-code').value = roomCode;
+    this.startOnlineSearch(roomCode);
+  }
+
+  startOnlineSearch(roomCode) {
     if (!window.WebSocket || !['http:', 'https:'].includes(window.location.protocol)) {
       this.showOnlineStatus('Para jugar en línea, abre el juego desde el servidor con npm start (no como archivo local).');
       return;
     }
-    if (this.onlineSocket) this.disconnectOnline();
+    this.disconnectOnline();
+    this.onlineMatchRequested = true;
+    this.onlineReconnectAttempt = 0;
+    this.onlineRoomCode = roomCode;
+    document.getElementById('online-room-code').value = roomCode || '';
+    this.connectOnline();
+  }
+
+  connectOnline() {
+    if (!this.onlineMatchRequested) return;
     this.gameMode = 'online';
     this.onlinePlayer = null;
     this.remoteKeys = {};
     this.setOnlineControlsDisabled(true);
     this.showOnlineStatus('Conectando al servidor de partidas...');
     const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${scheme}//${window.location.host}/multiplayer`);
+    let socket;
+    try {
+      socket = new WebSocket(`${scheme}//${window.location.host}/multiplayer`);
+    } catch (error) {
+      this.scheduleOnlineReconnect();
+      return;
+    }
     this.onlineSocket = socket;
 
     socket.addEventListener('open', () => {
-      if (this.onlineSocket !== socket) return;
-      socket.send(JSON.stringify({
-        type: 'queue',
-        fighter: this.getFighterConfig(1),
-        arena: document.getElementById('select-arena').value
-      }));
-      this.showOnlineStatus('Buscando un rival en línea... La partida comenzará al encontrar a otra persona.');
+      if (this.onlineSocket !== socket || !this.onlineMatchRequested) return;
+      try {
+        const queueMessage = {
+          type: 'queue',
+          fighter: this.getFighterConfig(1),
+          arena: document.getElementById('select-arena').value
+        };
+        if (this.onlineRoomCode) queueMessage.roomCode = this.onlineRoomCode;
+        socket.send(JSON.stringify(queueMessage));
+      } catch (error) {
+        this.scheduleOnlineReconnect();
+        return;
+      }
+      this.showOnlineStatus(this.onlineRoomCode
+        ? `Esperando a un rival en la sala ${this.onlineRoomCode}... Comparte el código para que se una.`
+        : 'Buscando un rival en línea... La partida comenzará al encontrar a otra persona.');
     });
     socket.addEventListener('message', event => {
       if (this.onlineSocket !== socket) return;
@@ -1099,8 +1155,12 @@ class Game3D {
         return;
       }
       if (message.type === 'waiting') {
-        this.showOnlineStatus('Buscando un rival en línea... La partida comenzará al encontrar a otra persona.');
+        this.onlineReconnectAttempt = 0;
+        this.showOnlineStatus(this.onlineRoomCode
+          ? `Esperando a un rival en la sala ${this.onlineRoomCode}... Comparte el código para que se una.`
+          : 'Buscando un rival en línea... La partida comenzará al encontrar a otra persona.');
       } else if (message.type === 'match') {
+        this.onlineReconnectAttempt = 0;
         this.onlinePlayer = message.playerNumber;
         this.remoteKeys = {};
         this.lastSentOnlineInput = null;
@@ -1119,8 +1179,7 @@ class Game3D {
         audio.stopBackgroundMusic();
         document.getElementById('game-screen').classList.add('hidden');
         document.getElementById('selection-screen').classList.remove('hidden');
-        this.showOnlineStatus('Tu rival se desconectó. Puedes buscar otra partida.');
-        this.disconnectOnline();
+        this.scheduleOnlineReconnect('Tu rival se desconectó. Buscando otra partida...');
       } else if (message.type === 'error') {
         this.showOnlineStatus(message.message || 'No se pudo encontrar una partida.');
         this.disconnectOnline();
@@ -1128,23 +1187,41 @@ class Game3D {
     });
     socket.addEventListener('error', () => {
       if (this.onlineSocket !== socket) return;
-      this.showOnlineStatus('No se pudo conectar al servidor. Comprueba que esté iniciado e inténtalo otra vez.');
+      this.scheduleOnlineReconnect();
     });
     socket.addEventListener('close', () => {
       if (this.onlineSocket !== socket) return;
-      this.onlineSocket = null;
-      if (this.isRunning && this.gameMode === 'online') {
-        this.isRunning = false;
-        audio.stopBackgroundMusic();
-        document.getElementById('game-screen').classList.add('hidden');
-        document.getElementById('selection-screen').classList.remove('hidden');
-        this.disconnectOnline();
-        this.showOnlineStatus('Se perdió la conexión con el servidor. Puedes buscar otra partida.');
-      } else if (!this.isRunning) {
-        this.disconnectOnline();
-        this.showOnlineStatus('Se perdió la conexión con el servidor. Inténtalo de nuevo.');
-      }
+      this.scheduleOnlineReconnect();
     });
+  }
+
+  scheduleOnlineReconnect(message = null) {
+    if (!this.onlineMatchRequested || this.onlineReconnectTimer !== null) return;
+    const socket = this.onlineSocket;
+    this.onlineSocket = null;
+    this.onlinePlayer = null;
+    this.remoteKeys = {};
+    this.lastSentOnlineInput = null;
+    if (socket && socket.readyState < WebSocket.CLOSING) socket.close();
+
+    if (this.gameMode === 'online'
+      && !document.getElementById('game-screen').classList.contains('hidden')) {
+      this.isRunning = false;
+      audio.stopBackgroundMusic();
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('selection-screen').classList.remove('hidden');
+      document.getElementById('modal-victory').classList.add('hidden');
+    }
+
+    this.setOnlineControlsDisabled(true);
+    const delay = Math.min(1000 * (2 ** this.onlineReconnectAttempt), 30_000);
+    this.onlineReconnectAttempt += 1;
+    const seconds = Math.ceil(delay / 1000);
+    this.showOnlineStatus(message || `Se perdió la conexión. Reintentando en ${seconds} s...`);
+    this.onlineReconnectTimer = window.setTimeout(() => {
+      this.onlineReconnectTimer = null;
+      this.connectOnline();
+    }, delay);
   }
 
   setOnlineControlsDisabled(disabled) {
@@ -1171,6 +1248,12 @@ class Game3D {
   }
 
   disconnectOnline() {
+    this.onlineMatchRequested = false;
+    this.onlineRoomCode = null;
+    if (this.onlineReconnectTimer !== null) {
+      window.clearTimeout(this.onlineReconnectTimer);
+      this.onlineReconnectTimer = null;
+    }
     const socket = this.onlineSocket;
     this.onlineSocket = null;
     this.onlinePlayer = null;

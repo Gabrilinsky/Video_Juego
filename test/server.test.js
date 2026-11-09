@@ -49,7 +49,11 @@ test('validates and whitelists online fighter configuration', () => {
   const cleanPayload = sanitizeQueuePayload(validPayload);
   assert.equal(cleanPayload.arena, 'colosseum');
   assert.equal(cleanPayload.fighter.weapon1, 'katana');
+  assert.equal(cleanPayload.roomCode, null);
   assert.equal('weaponUpgrades' in cleanPayload.fighter, false);
+  assert.equal(sanitizeQueuePayload({ ...validPayload, roomCode: 'a1b2c3' }).roomCode, 'A1B2C3');
+  assert.equal(sanitizeQueuePayload({ ...validPayload, roomCode: 'bad!' }), null);
+  assert.equal(sanitizeQueuePayload({ ...validPayload, roomCode: 123456 }), null);
   assert.equal(sanitizeQueuePayload({ ...validPayload, arena: '../server.js' }), null);
   assert.equal(sanitizeQueuePayload({
     ...validPayload,
@@ -94,6 +98,53 @@ test('pairs two players, relays controls, and broadcasts the result', async t =>
   playerOne.send(JSON.stringify({ type: 'finished', winner: 1 }));
   assert.equal((await resultOne).winner, 1);
   assert.equal((await resultTwo).winner, 1);
+});
+
+test('only matches players with the same room code', async t => {
+  const { httpServer, webSocketServer } = createGameServer();
+  await new Promise(resolve => httpServer.listen(0, '127.0.0.1', resolve));
+  const url = `ws://127.0.0.1:${httpServer.address().port}/multiplayer`;
+  const sockets = [];
+  t.after(async () => {
+    sockets.forEach(socket => socket.terminate());
+    await new Promise(resolve => webSocketServer.close(resolve));
+    await new Promise(resolve => httpServer.close(resolve));
+  });
+
+  const connectAndQueue = async roomCode => {
+    const socket = await connect(url);
+    sockets.push(socket);
+    const waiting = nextMessage(socket, 'waiting');
+    const match = roomCode === 'ABC123' ? nextMessage(socket, 'match') : null;
+    socket.send(JSON.stringify({ ...validPayload, roomCode }));
+    await waiting;
+    return { socket, match };
+  };
+  const { socket: publicPlayer } = await connectAndQueue(undefined);
+  const { socket: privateHost, match: privateHostMatch } = await connectAndQueue('ABC123');
+
+  const privateGuest = await connect(url);
+  sockets.push(privateGuest);
+  const privateGuestMatch = nextMessage(privateGuest, 'match');
+  const privateGuestWaiting = nextMessage(privateGuest, 'waiting');
+  privateGuest.send(JSON.stringify({ ...validPayload, roomCode: 'abc123' }));
+  await privateGuestWaiting;
+  const [hostMatch, guestMatch] = await Promise.all([
+    privateHostMatch,
+    privateGuestMatch
+  ]);
+  assert.equal(hostMatch.roomCode, 'ABC123');
+  assert.equal(guestMatch.roomCode, 'ABC123');
+
+  const publicPlayerMatch = nextMessage(publicPlayer, 'match');
+  const anotherPublicPlayer = await connect(url);
+  sockets.push(anotherPublicPlayer);
+  const secondPublicPlayerMatch = nextMessage(anotherPublicPlayer, 'match');
+  const secondPublicPlayerWaiting = nextMessage(anotherPublicPlayer, 'waiting');
+  anotherPublicPlayer.send(JSON.stringify(validPayload));
+  await secondPublicPlayerWaiting;
+  assert.equal((await publicPlayerMatch).roomCode, null);
+  assert.equal((await secondPublicPlayerMatch).roomCode, null);
 });
 
 test('keeps idle multiplayer connections alive with heartbeats', async t => {
