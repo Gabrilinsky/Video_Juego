@@ -1411,8 +1411,20 @@ class Game3D {
       this.p2.updateCPU(this.p1, this.projectiles, this.particles3D, this.scene, document.getElementById('select-difficulty').value);
     }
 
+    const fighterOrder = Math.sign(this.p2.x - this.p1.x) || 1;
     this.p1.update(this.p2, this.projectiles, this.particles3D, this.scene);
     this.p2.update(this.p1, this.projectiles, this.particles3D, this.scene);
+
+    const minFighterDistance = 0.9;
+    if ((this.p2.x - this.p1.x) * fighterOrder < minFighterDistance) {
+      const midpoint = THREE.MathUtils.clamp((this.p1.x + this.p2.x) / 2, -10 + minFighterDistance / 2, 10 - minFighterDistance / 2);
+      this.p1.x = midpoint - fighterOrder * minFighterDistance / 2;
+      this.p2.x = midpoint + fighterOrder * minFighterDistance / 2;
+      if (this.p1.vx * fighterOrder > 0) this.p1.vx = 0;
+      if (this.p2.vx * fighterOrder < 0) this.p2.vx = 0;
+      this.p1.group.position.x = this.p1.x;
+      this.p2.group.position.x = this.p2.x;
+    }
 
     // Projectile Movement & 3D Collisions
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
