@@ -6,6 +6,44 @@ body {
   overflow-x: hidden;
 }
 
+.page-scroll-control {
+  position: fixed;
+  z-index: 40;
+  top: 50%;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 7px;
+  border: 1px solid rgba(120, 53, 15, 0.8);
+  border-radius: 9999px;
+  background: rgba(12, 10, 9, 0.9);
+  color: #fbbf24;
+  box-shadow: 0 0 16px rgba(234, 179, 8, 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  visibility: hidden;
+  transition: opacity 150ms ease;
+}
+
+.page-scroll-control.is-scrollable {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+#page-scroll-slider {
+  width: 18px;
+  height: min(45vh, 320px);
+  min-height: 160px;
+  margin: 0;
+  accent-color: #f59e0b;
+  cursor: ns-resize;
+  writing-mode: vertical-lr;
+}
+
 .font-mk { 
   font-family: 'Cinzel Decorative', cursive, serif; 
 }
@@ -116,9 +154,6 @@ body {
   }
 
   #selection-screen {
-    max-height: calc(100dvh - 98px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
     padding: 14px;
   }
 
@@ -196,9 +231,6 @@ body.phone-mode main {
 
 body.phone-mode #selection-screen {
   max-width: 760px;
-  max-height: calc(100dvh - 98px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 14px;
 }
 

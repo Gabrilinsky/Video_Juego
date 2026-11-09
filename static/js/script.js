@@ -1516,4 +1516,28 @@ class Game3D {
   }
 }
 
-window.addEventListener('load', () => { window.game3D = new Game3D(); });
+function setupPageScrollSlider() {
+  const control = document.getElementById('page-scroll-control');
+  const slider = document.getElementById('page-scroll-slider');
+  if (!control || !slider) return;
+
+  const updateSlider = () => {
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    slider.max = String(maxScroll);
+    slider.value = String(Math.min(window.scrollY, maxScroll));
+    control.classList.toggle('is-scrollable', maxScroll > 0);
+  };
+
+  slider.addEventListener('input', () => {
+    window.scrollTo(0, Number(slider.value));
+  });
+  window.addEventListener('scroll', updateSlider, { passive: true });
+  window.addEventListener('resize', updateSlider);
+  new ResizeObserver(updateSlider).observe(document.documentElement);
+  updateSlider();
+}
+
+window.addEventListener('load', () => {
+  setupPageScrollSlider();
+  window.game3D = new Game3D();
+});
