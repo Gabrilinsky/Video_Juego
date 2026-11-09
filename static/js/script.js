@@ -1117,10 +1117,9 @@ class Game3D {
     this.remoteKeys = {};
     this.setOnlineControlsDisabled(true);
     this.showOnlineStatus('Conectando al servidor de partidas...');
-    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     let socket;
     try {
-      socket = new WebSocket(`${scheme}//${window.location.host}/multiplayer`);
+      socket = new WebSocket(this.getMultiplayerUrl());
     } catch (error) {
       this.scheduleOnlineReconnect();
       return;
@@ -1195,6 +1194,20 @@ class Game3D {
     });
   }
 
+  getServerBase() {
+    // Si el juego está en GitHub Pages, define window.SHADOW_KOMBAT_SERVER en index.html
+    // con la URL del servidor Node (por ejemplo https://mi-juego.onrender.com).
+    const configured = String(window.SHADOW_KOMBAT_SERVER || '').trim().replace(/\/+$/, '');
+    return configured || window.location.origin;
+  }
+
+  getMultiplayerUrl() {
+    const base = new URL(this.getServerBase());
+    base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
+    base.pathname = '/multiplayer';
+    return base.toString();
+  }
+
   scheduleOnlineReconnect(message = null) {
     if (!this.onlineMatchRequested || this.onlineReconnectTimer !== null) return;
     const socket = this.onlineSocket;
@@ -1229,7 +1242,7 @@ class Game3D {
   }
 
   diagnoseOnlineFailure(seconds) {
-    fetch('/healthz', { cache: 'no-store' })
+    fetch(`${this.getServerBase()}/healthz`, { cache: 'no-store' })
       .then(response => {
         if (!this.onlineMatchRequested) return;
         if (response.ok) {

@@ -74,7 +74,10 @@ function createGameServer({ heartbeatIntervalMs = 25_000 } = {}) {
       return;
     }
     if (url.pathname === '/healthz') {
-      response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end('{"status":"ok"}');
+      response.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Access-Control-Allow-Origin': '*'
+      }).end('{"status":"ok"}');
       return;
     }
     if (url.pathname !== '/' && !url.pathname.startsWith('/static/')) {
