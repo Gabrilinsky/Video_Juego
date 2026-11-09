@@ -1221,10 +1221,27 @@ class Game3D {
     this.showOnlineStatus(message || (failedAttempts >= 3
       ? `No se pudo conectar con el servidor de partidas (intento ${failedAttempts}). Revisa que el servidor esté activo y que permita WebSocket. Reintentando en ${seconds} s...`
       : `Se perdió la conexión. Reintentando en ${seconds} s...`));
+    if (!message && failedAttempts >= 2) this.diagnoseOnlineFailure(seconds);
     this.onlineReconnectTimer = window.setTimeout(() => {
       this.onlineReconnectTimer = null;
       this.connectOnline();
     }, delay);
+  }
+
+  diagnoseOnlineFailure(seconds) {
+    fetch('/healthz', { cache: 'no-store' })
+      .then(response => {
+        if (!this.onlineMatchRequested) return;
+        if (response.ok) {
+          this.showOnlineStatus(`El servidor responde por HTTP, pero rechaza la conexión WebSocket (/multiplayer). Puede ser un bloqueo del hosting/proxy o del origen. Reintentando en ${seconds} s...`);
+        } else {
+          this.showOnlineStatus(`Esta página no la sirve el servidor del juego (/healthz devolvió ${response.status}). Abre el juego desde la URL donde corre npm start. Reintentando en ${seconds} s...`);
+        }
+      })
+      .catch(() => {
+        if (!this.onlineMatchRequested) return;
+        this.showOnlineStatus(`No hay respuesta del servidor. Comprueba que esté encendido (npm start) y que tengas internet. Reintentando en ${seconds} s...`);
+      });
   }
 
   setOnlineControlsDisabled(disabled) {
