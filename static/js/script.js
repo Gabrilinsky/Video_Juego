@@ -700,6 +700,7 @@ class Game3D {
     this.remoteKeys = {};
     this.onlinePlayer = null;
     this.onlineSocket = null;
+    this.lastSentOnlineInput = null;
     this.shopPlayerId = 1;
     this.playerProgress = {
       1: { coins: this.loadCoins(1), upgrades: this.loadWeaponUpgrades(1) },
@@ -1102,11 +1103,13 @@ class Game3D {
       } else if (message.type === 'match') {
         this.onlinePlayer = message.playerNumber;
         this.remoteKeys = {};
+        this.lastSentOnlineInput = null;
         this.showOnlineStatus('', false);
         document.getElementById('p2-header-badge').innerText = `RIVAL EN LÍNEA · TÚ JUGADOR ${this.onlinePlayer}`;
         document.getElementById('touch-controls-p2').classList.add('hidden');
         this.matchWinner = null;
         this.startMatch(message);
+        this.broadcastOnlineInput();
       } else if (message.type === 'input') {
         this.remoteKeys = message.keys;
       } else if (message.type === 'finished') {
@@ -1155,6 +1158,9 @@ class Game3D {
     const codes = ['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyK', 'KeyL', 'KeyU', 'KeyI', 'KeyO'];
     const keys = {};
     codes.forEach(code => { keys[code] = !!this.keys[code]; });
+    const serializedKeys = JSON.stringify(keys);
+    if (serializedKeys === this.lastSentOnlineInput) return;
+    this.lastSentOnlineInput = serializedKeys;
     this.onlineSocket.send(JSON.stringify({ type: 'input', keys }));
   }
 
@@ -1169,6 +1175,7 @@ class Game3D {
     this.onlineSocket = null;
     this.onlinePlayer = null;
     this.remoteKeys = {};
+    this.lastSentOnlineInput = null;
     this.setOnlineControlsDisabled(false);
     this.gameMode = 'infinite';
     document.getElementById('p2-header-badge').innerText = 'RIVAL INFINITO (CPU AI)';
