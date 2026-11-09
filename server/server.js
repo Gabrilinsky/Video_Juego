@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { WebSocket, WebSocketServer } = require('ws');
 
-const ROOT = __dirname;
+const ROOT = path.resolve(__dirname, '..');
 const INPUT_CODES = ['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyJ', 'KeyK', 'KeyL', 'KeyU', 'KeyI', 'KeyO'];
 const ALLOWED = {
   arena: ['colosseum', 'volcano', 'cyber', 'forest', 'ice', 'temple'],

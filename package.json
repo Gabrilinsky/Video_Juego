@@ -4,7 +4,7 @@
   "private": true,
   "description": "Juego de lucha 3D con emparejamiento multijugador en línea",
   "scripts": {
-    "start": "node server.js",
+    "start": "node server/server.js",
     "test": "node --test"
   },
   "dependencies": {

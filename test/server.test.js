@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const WebSocket = require('ws');
-const { createGameServer, sanitizeQueuePayload } = require('../server');
+const { createGameServer, sanitizeQueuePayload } = require('../server/server');
 
 const validPayload = {
   type: 'queue',
